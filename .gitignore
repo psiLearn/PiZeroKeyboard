@@ -1,0 +1,18 @@
+# Build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Dotnet tooling
+.vs/
+*.user
+*.suo
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Logs
+*.log
