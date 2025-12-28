@@ -1,0 +1,35 @@
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Restore with minimal context
+COPY ReceiverApp/ReceiverApp.fsproj ReceiverApp/
+RUN dotnet restore ReceiverApp/ReceiverApp.fsproj -r linux-arm
+
+# Build only the receiver sources
+COPY ReceiverApp/ ReceiverApp/
+RUN dotnet publish ReceiverApp/ReceiverApp.fsproj -c Release -r linux-arm --self-contained true -p:PublishSingleFile=true -o /out
+
+FROM debian:bullseye-slim
+WORKDIR /opt/hid
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --no-create-home --uid 1000 app
+
+COPY PiSetup/setup-hid-gadget.sh ./setup-hid-gadget.sh
+RUN chmod +x ./setup-hid-gadget.sh
+
+COPY --from=build /out ./
+
+RUN cat <<'EOF' > /entrypoint.sh && chmod +x /entrypoint.sh
+#!/bin/bash
+set -e
+if [ -e /dev/hidg0 ]; then
+  chown app:app /dev/hidg0 || true
+fi
+exec gosu app:app /opt/hid/ReceiverApp "$@"
+EOF
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["5000"]

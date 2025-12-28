@@ -1,0 +1,27 @@
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Restore with minimal context
+COPY SenderApp/SenderApp.fsproj SenderApp/
+RUN dotnet restore SenderApp/SenderApp.fsproj -r linux-arm
+
+# Build only the sender sources
+COPY SenderApp/ SenderApp/
+RUN dotnet publish SenderApp/SenderApp.fsproj -c Release -r linux-arm --self-contained true -p:PublishSingleFile=true -o /out
+
+FROM debian:bullseye-slim
+WORKDIR /opt/linuxkey
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --no-create-home --uid 1000 app
+
+COPY --from=build /out ./
+
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+EXPOSE 8080
+
+USER app
+
+ENTRYPOINT ["./SenderApp"]

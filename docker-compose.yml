@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  receiver:
+    image: linuxkey-receiver:local
+    privileged: true
+    network_mode: host
+    devices:
+      - /dev/hidg0:/dev/hidg0
+    command: ["5000"]
+    restart: unless-stopped
+
+  sender:
+    image: linuxkey-sender:local
+    network_mode: host
+    depends_on:
+      - receiver
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      - SENDER_TARGET_IP=127.0.0.1
+      - SENDER_TARGET_PORT=5000
+      - SENDER_WEB_PORT=8080
