@@ -10,13 +10,29 @@ CONFIGFS=/sys/kernel/config
 GADGET=$CONFIGFS/usb_gadget/pi_keyboard
 
 if [[ ! -d $CONFIGFS ]]; then
-    echo "ConfigFS is not mounted at $CONFIGFS."
+    echo "ConfigFS is not available at $CONFIGFS."
     exit 1
+fi
+if ! grep -q " $CONFIGFS " /proc/mounts; then
+    mount -t configfs none "$CONFIGFS"
 fi
 
 if [[ -d $GADGET ]]; then
-    echo "USB HID gadget already configured at $GADGET."
-    exit 0
+    if [[ -e /dev/hidg0 ]]; then
+        echo "USB HID gadget already configured at $GADGET."
+        exit 0
+    fi
+    echo "USB HID gadget exists but /dev/hidg0 is missing. Recreating."
+    if [[ -f $GADGET/UDC ]]; then
+        current_udc=$(cat "$GADGET/UDC" || true)
+        if [[ -n $current_udc ]]; then
+            echo "Unbinding existing gadget from $current_udc."
+            echo "" > "$GADGET/UDC" || true
+        fi
+    fi
+    rm -f "$GADGET/configs/c.1/hid.usb0" 2>/dev/null || true
+    rm -rf "$GADGET/configs/c.1" "$GADGET/functions/hid.usb0" "$GADGET/strings/0x409" 2>/dev/null || true
+    rmdir "$GADGET" 2>/dev/null || true
 fi
 
 mkdir -p "$GADGET"
@@ -58,5 +74,8 @@ if [[ -z $available_udc ]]; then
     exit 1
 fi
 
+if [[ -f UDC ]]; then
+    echo "" > UDC
+fi
 echo "$available_udc" > UDC
 echo "USB HID gadget bound to $available_udc."

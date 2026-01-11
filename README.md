@@ -21,18 +21,38 @@ dotnet build ReceiverApp
 2. Run `sudo /opt/hid/setup-hid-gadget.sh` after copying the script to the Pi to expose `/dev/hidg0`.
 3. Publish the receiver with `dotnet publish ReceiverApp -c Release -r linux-arm --self-contained false` and run it with `sudo dotnet ReceiverApp.dll 5000`.
 
+### Raspberry Pi Zero 2 W (armv7) fresh install with Docker (recommended)
+
+1. Flash Raspberry Pi OS Lite (32-bit) to a fresh SD card with Raspberry Pi Imager.
+   - In Imager, open the OS customization (gear icon) and set:
+     - Hostname (for example `linuxkey`)
+     - Enable SSH (password or public key)
+     - Configure Wi-Fi (SSID, password, country)
+     - Username and password
+   - Write the image to the SD card.
+2. Mount the SD card on Windows. In the boot partition:
+   - Add `dtoverlay=dwc2,dr_mode=peripheral` to `config.txt`.
+   - Append `modules-load=dwc2` to the single-line `cmdline.txt` (keep it as one line).
+3. Insert the SD card into the Pi Zero 2 W and boot. Find the IP (router/DHCP list).
+4. On Windows, deploy the Docker stack over SSH:
+   - `.\deploy-docker.ps1 -Host <pi-ip> -User <username> -Port 5000 -Platform linux/arm/v7`
+5. Open the sender UI at `http://<pi-ip>:8080` (host networking). The receiver listens on port 5000.
+
+Why 32-bit? The Docker images in this repo are built for `linux/arm/v7`, which maps cleanly to 32-bit Raspberry Pi OS. If you prefer 64-bit Raspberry Pi OS, rebuild with `-Platform linux/arm64` and use arm64 base images for the Dockerfiles.
+
 ### Pi Zero (armv6) deployment (Python fallback)
 
 - .NET 9/ASP.NET Core do not support armv6. Use the Python-based receiver/sender under `pi-zero/` on a Pi Zero.
 - Setup:
-  1. Copy `pi-zero/` and `PiSetup/setup-hid-gadget.sh` to the Pi (or use `pi-zero/install-to-sd.ps1 -BootDrive E: -Port 5000` on Windows to prepare the SD card with an install script).
-  2. On the Pi: `sudo apt-get update && sudo apt-get install -y python3 python3-pip`.
-  3. Optional (for web UI): `pip3 install --user -r pi-zero/requirements-pizero.txt`.
+  1. Fast path: on Windows run `pi-zero/install-to-sd.ps1 -BootDrive E: -Port 5000`, then on the Pi run `sudo /boot/install-linuxkey-pizero.sh`. This installs Python deps system-wide, sets up HID, and enables a systemd service for the Python receiver.
+  2. Manual: copy `pi-zero/` and `PiSetup/setup-hid-gadget.sh` to the Pi, then `sudo apt-get update && sudo apt-get install -y python3 python3-pip`.
+  3. Optional (for web UI): `pip3 install -r pi-zero/requirements-pizero.txt` (install system-wide so the service can use Flask).
   4. Run HID setup: `sudo bash /path/to/setup-hid-gadget.sh`.
   5. Start receiver: `cd /path/to/pi-zero && sudo python3 receiver.py 5000 --hid-path=/dev/hidg0`.
   6. Send text:
      - CLI: `python3 sender.py cli 127.0.0.1 5000 "Hello world!"`
      - Web (if Flask installed): `python3 sender.py serve 127.0.0.1 5000 --web-port 8080 --token yourtoken` (binds to 127.0.0.1 by default; add `--host 0.0.0.0` only if you need LAN access and protect it with a token). Then open `http://<pi-ip>:8080`.
+  7. If the Pi is already booted and reachable, you can enable the USB gadget stack over SSH with `pi-zero/init-over-ssh.ps1 -Host <pi-ip> -User <username> -HidSetupPath /boot/linuxkey/setup-hid-gadget.sh`.
 
 ### Docker deployment
 

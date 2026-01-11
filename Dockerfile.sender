@@ -1,4 +1,6 @@
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+ARG BUILDPLATFORM=linux/amd64
+
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Restore with minimal context
@@ -9,11 +11,11 @@ RUN dotnet restore SenderApp/SenderApp.fsproj -r linux-arm
 COPY SenderApp/ SenderApp/
 RUN dotnet publish SenderApp/SenderApp.fsproj -c Release -r linux-arm --self-contained true -p:PublishSingleFile=true -o /out
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 WORKDIR /opt/linuxkey
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates libicu72 libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --no-create-home --uid 1000 app
 

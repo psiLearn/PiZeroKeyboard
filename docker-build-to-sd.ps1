@@ -36,16 +36,18 @@ docker buildx build `
     --platform $Platform `
     -f (Join-Path $PSScriptRoot "Dockerfile.receiver") `
     -t $ReceiverImage `
-    --output type=docker,dest=$tarPath `
+    --load `
     $PSScriptRoot
+docker save -o $tarPath $ReceiverImage
 
 Write-Host "Building sender image ($Platform) -> $senderTar" -ForegroundColor Cyan
 docker buildx build `
     --platform $Platform `
     -f (Join-Path $PSScriptRoot "Dockerfile.sender") `
     -t $SenderImage `
-    --output type=docker,dest=$senderTar `
+    --load `
     $PSScriptRoot
+docker save -o $senderTar $SenderImage
 
 foreach ($p in @($tarPath, $senderTar)) {
     if (-not (Test-Path $p)) { throw "Build did not produce $p" }
@@ -85,12 +87,12 @@ services:
 "@
 Set-Content -Path (Join-Path $targetDir "docker-compose.yml") -Value $composeContent -Encoding ASCII
 
-$installScript = @"
+$installScript = @'
 #!/bin/bash
 set -euo pipefail
 
-arch=\$(uname -m)
-if [ "\$arch" = "armv6l" ]; then
+arch=$(uname -m)
+if [ "$arch" = "armv6l" ]; then
     echo "armv6l detected: .NET container images do not support Pi Zero (armv6). Use a Pi with armv7+ or deploy without Docker." >&2
     exit 1
 fi
@@ -100,7 +102,27 @@ if ! command -v docker >/dev/null 2>&1; then
     sudo apt-get install -y docker.io
 fi
 
-sudo apt-get install -y docker-compose-plugin
+compose_cmd=()
+if docker compose version >/dev/null 2>&1; then
+  compose_cmd=(sudo docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  compose_cmd=(sudo docker-compose)
+else
+  sudo apt-get install -y docker-compose-plugin || sudo apt-get install -y docker-compose
+  if docker compose version >/dev/null 2>&1; then
+    compose_cmd=(sudo docker compose)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    compose_cmd=(sudo docker-compose)
+  else
+    echo "Docker Compose not available." >&2
+    exit 1
+  fi
+fi
+
+sudo modprobe libcomposite || true
+if ! mountpoint -q /sys/kernel/config; then
+  sudo mount -t configfs none /sys/kernel/config
+fi
 
 sudo bash /boot/linuxkey/setup-hid-gadget.sh
 sudo docker load -i /boot/linuxkey/linuxkey-receiver.tar
@@ -108,9 +130,10 @@ sudo docker load -i /boot/linuxkey/linuxkey-sender.tar
 sudo docker rm -f linuxkey-receiver || true
 sudo docker rm -f linuxkey-sender || true
 
-sudo docker compose -f /boot/linuxkey/docker-compose.yml up -d
+"${compose_cmd[@]}" -f /boot/linuxkey/docker-compose.yml up -d
 echo "LinuxKey stack deployed (receiver + sender)."
-"@
+'@
+
 
 $installPath = Join-Path $bootRoot "install-linuxkey-docker.sh"
 Set-Content -Path $installPath -Value $installScript -Encoding ASCII

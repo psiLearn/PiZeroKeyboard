@@ -20,3 +20,9 @@ ehthumbs.db
 
 # Logs
 *.log
+
+# Docker build artifacts
+linuxkey-*.tar
+
+# Temp publish output
+.tmp-publish-*/
