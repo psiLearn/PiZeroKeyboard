@@ -18,8 +18,9 @@ dotnet build ReceiverApp
 ## Deploy on Raspberry Pi
 
 1. Ensure OTG mode is enabled in `/boot/config.txt` and `/boot/cmdline.txt` by loading the `dwc2` driver.
-2. Run `sudo /opt/hid/setup-hid-gadget.sh` after copying the script to the Pi to expose `/dev/hidg0`.
-3. Publish the receiver with `dotnet publish ReceiverApp -c Release -r linux-arm --self-contained false` and run it with `sudo dotnet ReceiverApp.dll 5000`.
+2. On Pi Zero 2 W, disable the built-in `dwc_otg` host driver by adding `initcall_blacklist=dwc_otg_driver_init` to `/boot/cmdline.txt`, then reboot.
+3. Run `sudo /opt/hid/setup-hid-gadget.sh` after copying the script to the Pi to expose `/dev/hidg0`.
+4. Publish the receiver with `dotnet publish ReceiverApp -c Release -r linux-arm --self-contained false` and run it with `sudo dotnet ReceiverApp.dll 5000`.
 
 ### Raspberry Pi Zero 2 W (armv7) fresh install with Docker (recommended)
 
@@ -32,11 +33,13 @@ dotnet build ReceiverApp
    - Write the image to the SD card.
 2. Mount the SD card on Windows. In the boot partition:
    - Add `dtoverlay=dwc2,dr_mode=peripheral` to `config.txt`.
-   - Append `modules-load=dwc2` to the single-line `cmdline.txt` (keep it as one line).
+   - Append `modules-load=dwc2 initcall_blacklist=dwc_otg_driver_init` to the single-line `cmdline.txt` (keep it as one line).
+   - Optional: run `pi-zero/init-sd.ps1 -BootDrive E: -ForceDwc2` to apply these settings.
 3. Insert the SD card into the Pi Zero 2 W and boot. Find the IP (router/DHCP list).
 4. On Windows, deploy the Docker stack over SSH:
    - `.\deploy-docker.ps1 -Host <pi-ip> -User <username> -Port 5000 -Platform linux/arm/v7`
 5. Open the sender UI at `http://<pi-ip>:8080` (host networking). The receiver listens on port 5000.
+6. If `/sys/class/udc` is empty after boot, `dwc_otg` still owns the controller; verify the cmdline and reboot.
 
 Why 32-bit? The Docker images in this repo are built for `linux/arm/v7`, which maps cleanly to 32-bit Raspberry Pi OS. If you prefer 64-bit Raspberry Pi OS, rebuild with `-Platform linux/arm64` and use arm64 base images for the Dockerfiles.
 
@@ -52,7 +55,7 @@ Why 32-bit? The Docker images in this repo are built for `linux/arm/v7`, which m
   6. Send text:
      - CLI: `python3 sender.py cli 127.0.0.1 5000 "Hello world!"`
      - Web (if Flask installed): `python3 sender.py serve 127.0.0.1 5000 --web-port 8080 --token yourtoken` (binds to 127.0.0.1 by default; add `--host 0.0.0.0` only if you need LAN access and protect it with a token). Then open `http://<pi-ip>:8080`.
-  7. If the Pi is already booted and reachable, you can enable the USB gadget stack over SSH with `pi-zero/init-over-ssh.ps1 -Host <pi-ip> -User <username> -HidSetupPath /boot/linuxkey/setup-hid-gadget.sh`.
+  7. If the Pi is already booted and reachable, you can enable the USB gadget stack over SSH with `pi-zero/init-over-ssh.ps1 -Host <pi-ip> -User <username> -HidSetupPath /boot/linuxkey/setup-hid-gadget.sh -ForceDwc2`.
 
 ### Docker deployment
 

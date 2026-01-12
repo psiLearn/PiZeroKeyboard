@@ -36,18 +36,64 @@ let parseOptions (argv: string[]) =
       Emulate = emulate
       HidPath = hidPath }
 
-let createSender (stream: FileStream) =
+let openHidStream path =
+    printfn "Waiting for HID device at %s..." path
+    let rec loop () =
+        if not (File.Exists path) then
+            Thread.Sleep 1000
+            loop ()
+        else
+            try
+                new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite)
+            with
+            | :? IOException
+            | :? UnauthorizedAccessException ->
+                Thread.Sleep 1000
+                loop ()
+    loop ()
+
+let createSender hidPath =
+    let mutable stream: FileStream option = None
+
+    let rec ensureStream () =
+        match stream with
+        | Some current when current.CanWrite -> current
+        | Some current ->
+            current.Dispose()
+            stream <- None
+            ensureStream ()
+        | None ->
+            let opened = openHidStream hidPath
+            stream <- Some opened
+            opened
+
+    let writeReport (payload: byte[]) =
+        let rec attempt () =
+            try
+                let current = ensureStream ()
+                current.Write(payload, 0, payload.Length)
+                current.Flush()
+            with
+            | :? FileNotFoundException
+            | :? IOException
+            | :? UnauthorizedAccessException
+            | :? ObjectDisposedException ->
+                eprintfn "HID write failed. Reopening %s..." hidPath
+                stream |> Option.iter (fun current -> current.Dispose())
+                stream <- None
+                Thread.Sleep 250
+                attempt ()
+        attempt ()
+
     fun (hid: HidKey) ->
         let press = Array.zeroCreate<byte> 8
         press.[0] <- hid.Modifier
         press.[2] <- hid.Key
-        stream.Write(press, 0, press.Length)
-        stream.Flush()
+        writeReport press
         Thread.Sleep 5
 
         let release = Array.zeroCreate<byte> 8
-        stream.Write(release, 0, release.Length)
-        stream.Flush()
+        writeReport release
         Thread.Sleep 5
 
 let logUnsupported c =
@@ -88,8 +134,7 @@ let main argv =
         let noop _ = ()
         runLoop noop
     else
-        use hidStream = new FileStream(options.HidPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite)
-        let send = createSender hidStream
+        let send = createSender options.HidPath
         runLoop send
 
     0

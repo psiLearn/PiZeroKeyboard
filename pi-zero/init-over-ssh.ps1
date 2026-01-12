@@ -11,8 +11,12 @@ param(
     [bool]$CopyHidSetup = $true,
     # Whether to run the HID setup script (if present)
     [bool]$RunHidSetup = $true,
+    # Force dwc2 by blacklisting dwc_otg at boot (Pi Zero / Zero 2 W)
+    [switch]$ForceDwc2 = $true,
+    # Install and enable a systemd service to re-run HID setup at boot
+    [switch]$InstallHidService = $true,
     # Reboot after enabling dwc2 (recommended)
-    [bool]$Reboot = $true
+    [switch]$Reboot = $true
 )
 
 Set-StrictMode -Version Latest
@@ -28,7 +32,10 @@ if ($CopyHidSetup -and -not (Get-Command scp -ErrorAction SilentlyContinue)) {
 }
 
 $hidPath = if ($RunHidSetup) { $remoteHidPath } else { "" }
+$hidServicePath = $remoteHidPath
 $rebootFlag = if ($Reboot) { "1" } else { "0" }
+$forceDwc2Flag = if ($ForceDwc2) { "1" } else { "0" }
+$installHidServiceFlag = if ($InstallHidService) { "1" } else { "0" }
 
 if ($CopyHidSetup) {
     $remoteTemp = "/tmp/linuxkey-setup-hid-gadget.sh"
@@ -41,20 +48,32 @@ $remote = @'
 set -e
 CFG="/boot/config.txt"
 CMD="/boot/cmdline.txt"
+USERCFG="/boot/usercfg.txt"
 if [ -f /boot/firmware/config.txt ]; then
   CFG="/boot/firmware/config.txt"
   CMD="/boot/firmware/cmdline.txt"
+  USERCFG="/boot/firmware/usercfg.txt"
 fi
 if [ ! -f "$CFG" ] || [ ! -f "$CMD" ]; then
   echo "Missing boot config at $CFG or $CMD." >&2
   exit 1
 fi
-if grep -q '^dtoverlay=dwc2' "$CFG"; then
-  if ! grep -q '^dtoverlay=dwc2.*dr_mode=peripheral' "$CFG"; then
-    sudo sed -i 's/^dtoverlay=dwc2.*/dtoverlay=dwc2,dr_mode=peripheral/' "$CFG"
+if ! grep -q '^include usercfg.txt' "$CFG"; then
+  echo 'include usercfg.txt' | sudo tee -a "$CFG" >/dev/null
+fi
+sudo touch "$USERCFG"
+if ! grep -q '^\[all\]' "$USERCFG"; then
+  echo '[all]' | sudo tee -a "$USERCFG" >/dev/null
+fi
+if grep -q '^dtoverlay=dwc2' "$USERCFG"; then
+  if ! grep -q '^dtoverlay=dwc2.*dr_mode=peripheral' "$USERCFG"; then
+    sudo sed -i 's/^dtoverlay=dwc2.*/dtoverlay=dwc2,dr_mode=peripheral/' "$USERCFG"
   fi
 else
-  echo 'dtoverlay=dwc2,dr_mode=peripheral' | sudo tee -a "$CFG" >/dev/null
+  echo 'dtoverlay=dwc2,dr_mode=peripheral' | sudo tee -a "$USERCFG" >/dev/null
+fi
+if grep -q '^dtoverlay=dwc2' "$CFG"; then
+  sudo sed -i '/^dtoverlay=dwc2/d' "$CFG" || true
 fi
 if ! grep -q 'modules-load=dwc2' "$CMD"; then
   if grep -q ' rootwait' "$CMD"; then
@@ -62,6 +81,38 @@ if ! grep -q 'modules-load=dwc2' "$CMD"; then
   else
     sudo sh -c "printf '%s modules-load=dwc2' \"$(cat $CMD)\" > $CMD"
   fi
+fi
+if [ "__FORCE_DWC2__" = "1" ]; then
+  if ! grep -q 'initcall_blacklist=dwc_otg_driver_init' "$CMD"; then
+    sudo sh -c "printf '%s initcall_blacklist=dwc_otg_driver_init' \"$(cat $CMD)\" > $CMD"
+  fi
+  echo 'blacklist dwc_otg' | sudo tee /etc/modprobe.d/blacklist-dwc-otg.conf >/dev/null
+fi
+HID_SERVICE_PATH="__HID_SERVICE__"
+if [ "__INSTALL_HID_SERVICE__" = "1" ] && [ -n "$HID_SERVICE_PATH" ]; then
+  sudo mkdir -p /boot/linuxkey
+  if [ -f "$HID_SERVICE_PATH" ] && [ "$HID_SERVICE_PATH" != "/boot/linuxkey/setup-hid-gadget.sh" ]; then
+    sudo cp "$HID_SERVICE_PATH" /boot/linuxkey/setup-hid-gadget.sh
+    sudo chmod +x /boot/linuxkey/setup-hid-gadget.sh
+    HID_SERVICE_PATH="/boot/linuxkey/setup-hid-gadget.sh"
+  fi
+  cat <<EOF | sudo tee /etc/systemd/system/linuxkey-hid-gadget.service >/dev/null
+[Unit]
+Description=LinuxKey USB HID gadget setup
+After=systemd-modules-load.service
+Wants=systemd-modules-load.service
+ConditionPathExists=$HID_SERVICE_PATH
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $HID_SERVICE_PATH
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  sudo systemctl daemon-reload
+  sudo systemctl enable linuxkey-hid-gadget.service
 fi
 sudo modprobe libcomposite || true
 if ! mountpoint -q /sys/kernel/config; then
@@ -71,14 +122,15 @@ HID_SETUP_PATH="__HID_SETUP__"
 if [ -n "$HID_SETUP_PATH" ]; then
   if [ ! -f "$HID_SETUP_PATH" ]; then
     echo "HID setup script not found at $HID_SETUP_PATH. Skipping."
-  else
-    if [ -z "$(ls /sys/class/udc 2>/dev/null)" ]; then
-      echo "UDC not available yet. Reboot and rerun to complete HID setup."
-      if [ "__REBOOT__" = "1" ]; then
-        sudo reboot
+    else
+      if [ -z "$(ls /sys/class/udc 2>/dev/null)" ]; then
+        echo "UDC not available yet. Reboot and rerun to complete HID setup."
+        echo "If it stays empty, ensure dwc_otg is disabled (initcall_blacklist=dwc_otg_driver_init)."
+        if [ "__REBOOT__" = "1" ]; then
+          sudo reboot
+        fi
+        exit 0
       fi
-      exit 0
-    fi
     sudo bash "$HID_SETUP_PATH"
   fi
 fi
@@ -89,7 +141,7 @@ else
 fi
 '@
 
-$remote = $remote.Replace("__HID_SETUP__", $hidPath).Replace("__REBOOT__", $rebootFlag)
+$remote = $remote.Replace("__HID_SETUP__", $hidPath).Replace("__HID_SERVICE__", $hidServicePath).Replace("__REBOOT__", $rebootFlag).Replace("__FORCE_DWC2__", $forceDwc2Flag).Replace("__INSTALL_HID_SERVICE__", $installHidServiceFlag)
 
 Write-Host "Enabling dwc2 and HID setup on $TargetHost..." -ForegroundColor Cyan
 ssh -p $SshPort "${User}@${TargetHost}" "$remote"

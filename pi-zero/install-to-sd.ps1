@@ -32,6 +32,25 @@ set -euo pipefail
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip
 
+cat <<'EOF' | sudo tee /etc/systemd/system/linuxkey-hid-gadget.service >/dev/null
+[Unit]
+Description=LinuxKey USB HID gadget setup
+After=systemd-modules-load.service
+Wants=systemd-modules-load.service
+ConditionPathExists=/boot/linuxkey/setup-hid-gadget.sh
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /boot/linuxkey/setup-hid-gadget.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable linuxkey-hid-gadget.service
+
 sudo bash /boot/linuxkey/setup-hid-gadget.sh
 
 pip3 install -r /boot/linuxkey/requirements-pizero.txt || true

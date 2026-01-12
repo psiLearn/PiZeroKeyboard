@@ -6,7 +6,9 @@ param(
     # Optional Wi-Fi configuration written to /boot/wpa_supplicant.conf
     [string]$WifiSsid,
     [string]$WifiPsk,
-    [string]$WifiCountry = "US"
+    [string]$WifiCountry = "US",
+    # Force dwc2 by blacklisting dwc_otg (Pi Zero / Zero 2 W)
+    [switch]$ForceDwc2 = $true
 )
 
 Set-StrictMode -Version Latest
@@ -29,14 +31,24 @@ if (-not (Test-Path $cmdlinePath)) {
 
 Write-Host "Enabling USB gadget (dwc2)..." -ForegroundColor Cyan
 $config = Get-Content $configPath -Raw
-if ($config -match '(?m)^\s*dtoverlay=dwc2') {
-    if ($config -notmatch '(?m)^\s*dtoverlay=dwc2.*dr_mode=peripheral') {
-        $config = [regex]::Replace($config, '(?m)^\s*dtoverlay=dwc2.*$', 'dtoverlay=dwc2,dr_mode=peripheral')
-        Set-Content -Path $configPath -Value $config -Encoding ASCII
-    }
-} else {
-    Add-Content -Path $configPath -Value "dtoverlay=dwc2,dr_mode=peripheral" -Encoding ASCII
+$userCfgPath = Join-Path $bootRoot "usercfg.txt"
+$useUserCfg = ($config -match '(?m)^\s*include\s+usercfg\.txt') -or (Test-Path $userCfgPath)
+
+if ($useUserCfg -and ($config -notmatch '(?m)^\s*include\s+usercfg\.txt')) {
+    Add-Content -Path $configPath -Value "include usercfg.txt" -Encoding ASCII
 }
+
+$overlayPath = if ($useUserCfg) { $userCfgPath } else { $configPath }
+$overlay = if (Test-Path $overlayPath) { Get-Content $overlayPath -Raw } else { "" }
+if ($overlay -notmatch '(?m)^\s*\[all\]\s*$') {
+    $overlay = ($overlay.TrimEnd() + "`r`n[all]`r`n").TrimStart()
+}
+if ($overlay -match '(?m)^\s*dtoverlay=dwc2') {
+    $overlay = [regex]::Replace($overlay, '(?m)^\s*dtoverlay=dwc2.*$', 'dtoverlay=dwc2,dr_mode=peripheral')
+} else {
+    $overlay = ($overlay.TrimEnd() + "`r`ndtoverlay=dwc2,dr_mode=peripheral`r`n").TrimStart()
+}
+Set-Content -Path $overlayPath -Value $overlay -Encoding ASCII
 
 $cmdline = (Get-Content $cmdlinePath -Raw).Trim()
 if ($cmdline -notmatch 'modules-load=dwc2') {
@@ -45,8 +57,11 @@ if ($cmdline -notmatch 'modules-load=dwc2') {
     } else {
         $cmdline = "$cmdline modules-load=dwc2"
     }
-    Set-Content -Path $cmdlinePath -Value $cmdline -NoNewline -Encoding ASCII
 }
+if ($ForceDwc2 -and ($cmdline -notmatch 'initcall_blacklist=dwc_otg_driver_init')) {
+    $cmdline = "$cmdline initcall_blacklist=dwc_otg_driver_init"
+}
+Set-Content -Path $cmdlinePath -Value $cmdline -NoNewline -Encoding ASCII
 
 if ($EnableSsh) {
     Write-Host "Enabling SSH..." -ForegroundColor Cyan

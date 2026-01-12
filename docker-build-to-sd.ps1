@@ -124,13 +124,31 @@ if ! mountpoint -q /sys/kernel/config; then
   sudo mount -t configfs none /sys/kernel/config
 fi
 
+cat <<'EOF' | sudo tee /etc/systemd/system/linuxkey-hid-gadget.service >/dev/null
+[Unit]
+Description=LinuxKey USB HID gadget setup
+After=systemd-modules-load.service
+Wants=systemd-modules-load.service
+ConditionPathExists=/boot/linuxkey/setup-hid-gadget.sh
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /boot/linuxkey/setup-hid-gadget.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable linuxkey-hid-gadget.service
 sudo bash /boot/linuxkey/setup-hid-gadget.sh
 sudo docker load -i /boot/linuxkey/linuxkey-receiver.tar
 sudo docker load -i /boot/linuxkey/linuxkey-sender.tar
 sudo docker rm -f linuxkey-receiver || true
 sudo docker rm -f linuxkey-sender || true
 
-"${compose_cmd[@]}" -f /boot/linuxkey/docker-compose.yml up -d
+"${compose_cmd[@]}" -f /boot/linuxkey/docker-compose.yml up -d --force-recreate
 echo "LinuxKey stack deployed (receiver + sender)."
 '@
 

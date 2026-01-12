@@ -21,6 +21,10 @@ ehthumbs.db
 # Logs
 *.log
 
+# Python caches
+__pycache__/
+*.pyc
+
 # Docker build artifacts
 linuxkey-*.tar
 
