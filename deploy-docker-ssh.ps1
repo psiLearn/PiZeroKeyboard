@@ -127,6 +127,8 @@ services:
     image: $ReceiverImage
     privileged: true
     network_mode: host
+    environment:
+      - RECEIVER_LAYOUT=en
     devices:
       - /dev/hidg0:/dev/hidg0
     command: ["$Port"]
@@ -143,6 +145,7 @@ services:
       - SENDER_TARGET_IP=127.0.0.1
       - SENDER_TARGET_PORT=$Port
       - SENDER_WEB_PORT=8080
+      - SENDER_USB_STATE_PATH=/sys/class/udc/3f980000.usb/state
 "@
 Set-Content -Path $composeTemp -Value $composeContent -Encoding ASCII
 

@@ -7,9 +7,24 @@ type HidKey =
       Key: byte }
 
 module HidMapping =
-    let private uppercaseMask = 0x02uy
+    type KeyboardLayout =
+        | En
+        | De
 
-    let keyMap =
+    let private shiftMask = 0x02uy
+    let private rightAltMask = 0x40uy
+
+    let tryParseLayout (value: string) =
+        match value.Trim().ToLowerInvariant() with
+        | "de"
+        | "de-de"
+        | "german" -> Some De
+        | "en"
+        | "en-us"
+        | "us" -> Some En
+        | _ -> None
+
+    let keyMapUs =
         [
             'a', { Modifier = 0uy; Key = 0x04uy }
             'b', { Modifier = 0uy; Key = 0x05uy }
@@ -61,36 +76,140 @@ module HidMapping =
             ',', { Modifier = 0uy; Key = 0x36uy }
             '.', { Modifier = 0uy; Key = 0x37uy }
             '/', { Modifier = 0uy; Key = 0x38uy }
-            '_', { Modifier = 0x02uy; Key = 0x2Duy }
-            '+', { Modifier = 0x02uy; Key = 0x2Euy }
-            '{', { Modifier = 0x02uy; Key = 0x2Fuy }
-            '}', { Modifier = 0x02uy; Key = 0x30uy }
-            '|', { Modifier = 0x02uy; Key = 0x31uy }
-            ':', { Modifier = 0x02uy; Key = 0x33uy }
-            '"', { Modifier = 0x02uy; Key = 0x34uy }
-            '~', { Modifier = 0x02uy; Key = 0x35uy }
-            '<', { Modifier = 0x02uy; Key = 0x36uy }
-            '>', { Modifier = 0x02uy; Key = 0x37uy }
-            '?', { Modifier = 0x02uy; Key = 0x38uy }
-            '!', { Modifier = 0x02uy; Key = 0x1Euy }
-            '@', { Modifier = 0x02uy; Key = 0x1Fuy }
-            '#', { Modifier = 0x02uy; Key = 0x20uy }
-            '$', { Modifier = 0x02uy; Key = 0x21uy }
-            '%', { Modifier = 0x02uy; Key = 0x22uy }
-            '^', { Modifier = 0x02uy; Key = 0x23uy }
-            '&', { Modifier = 0x02uy; Key = 0x24uy }
-            '*', { Modifier = 0x02uy; Key = 0x25uy }
-            '(', { Modifier = 0x02uy; Key = 0x26uy }
-            ')', { Modifier = 0x02uy; Key = 0x27uy }
+            '_', { Modifier = shiftMask; Key = 0x2Duy }
+            '+', { Modifier = shiftMask; Key = 0x2Euy }
+            '{', { Modifier = shiftMask; Key = 0x2Fuy }
+            '}', { Modifier = shiftMask; Key = 0x30uy }
+            '|', { Modifier = shiftMask; Key = 0x31uy }
+            ':', { Modifier = shiftMask; Key = 0x33uy }
+            '"', { Modifier = shiftMask; Key = 0x34uy }
+            '~', { Modifier = shiftMask; Key = 0x35uy }
+            '<', { Modifier = shiftMask; Key = 0x36uy }
+            '>', { Modifier = shiftMask; Key = 0x37uy }
+            '?', { Modifier = shiftMask; Key = 0x38uy }
+            '!', { Modifier = shiftMask; Key = 0x1Euy }
+            '@', { Modifier = shiftMask; Key = 0x1Fuy }
+            '#', { Modifier = shiftMask; Key = 0x20uy }
+            '$', { Modifier = shiftMask; Key = 0x21uy }
+            '%', { Modifier = shiftMask; Key = 0x22uy }
+            '^', { Modifier = shiftMask; Key = 0x23uy }
+            '&', { Modifier = shiftMask; Key = 0x24uy }
+            '*', { Modifier = shiftMask; Key = 0x25uy }
+            '(', { Modifier = shiftMask; Key = 0x26uy }
+            ')', { Modifier = shiftMask; Key = 0x27uy }
         ]
         |> dict
 
-    let private tryLookup (c: char) =
-        match keyMap.TryGetValue c with
+    let keyMapDe =
+        let map = Collections.Generic.Dictionary<char, HidKey>()
+        for KeyValue(key, value) in keyMapUs do
+            map.[key] <- value
+
+        let overrides =
+            [
+                'y', { Modifier = 0uy; Key = 0x1Duy }
+                'z', { Modifier = 0uy; Key = 0x1Cuy }
+                '\u00e4', { Modifier = 0uy; Key = 0x34uy }
+                '\u00f6', { Modifier = 0uy; Key = 0x33uy }
+                '\u00fc', { Modifier = 0uy; Key = 0x2Fuy }
+                '\u00df', { Modifier = 0uy; Key = 0x2Duy }
+                '-', { Modifier = 0uy; Key = 0x38uy }
+                '_', { Modifier = shiftMask; Key = 0x38uy }
+                '/', { Modifier = shiftMask; Key = 0x24uy }
+                '?', { Modifier = shiftMask; Key = 0x2Duy }
+                '+', { Modifier = 0uy; Key = 0x30uy }
+                '*', { Modifier = shiftMask; Key = 0x30uy }
+                ';', { Modifier = shiftMask; Key = 0x36uy }
+                ':', { Modifier = shiftMask; Key = 0x37uy }
+                '"', { Modifier = shiftMask; Key = 0x1Fuy }
+                '\'', { Modifier = shiftMask; Key = 0x32uy }
+                '#', { Modifier = 0uy; Key = 0x32uy }
+                '@', { Modifier = rightAltMask; Key = 0x14uy }
+                '[', { Modifier = rightAltMask; Key = 0x25uy }
+                ']', { Modifier = rightAltMask; Key = 0x26uy }
+                '{', { Modifier = rightAltMask; Key = 0x24uy }
+                '}', { Modifier = rightAltMask; Key = 0x27uy }
+                '\\', { Modifier = rightAltMask; Key = 0x2Duy }
+                '|', { Modifier = rightAltMask; Key = 0x64uy }
+                '<', { Modifier = 0uy; Key = 0x64uy }
+                '>', { Modifier = shiftMask; Key = 0x64uy }
+                '=', { Modifier = shiftMask; Key = 0x27uy }
+                '^', { Modifier = 0uy; Key = 0x35uy }
+                '&', { Modifier = shiftMask; Key = 0x23uy }
+                '\u20ac', { Modifier = rightAltMask; Key = 0x08uy }
+                '\u00a7', { Modifier = shiftMask; Key = 0x20uy }
+            ]
+
+        for key, value in overrides do
+            map.[key] <- value
+
+        map :> Collections.Generic.IDictionary<char, HidKey>
+
+    let modifierMap =
+        [
+            "WIN", 0x08uy
+            "LWIN", 0x08uy
+            "RWIN", 0x80uy
+            "CTRL", 0x01uy
+            "LCTRL", 0x01uy
+            "RCTRL", 0x10uy
+            "ALT", 0x04uy
+            "LALT", 0x04uy
+            "RALT", 0x40uy
+            "ALTGR", 0x40uy
+            "SHIFT", 0x02uy
+            "LSHIFT", 0x02uy
+            "RSHIFT", 0x20uy
+        ]
+        |> dict
+
+    let specialKeyMap =
+        [
+            "BACKSPACE", { Modifier = 0uy; Key = 0x2Auy }
+            "BKSP", { Modifier = 0uy; Key = 0x2Auy }
+            "ENTER", { Modifier = 0uy; Key = 0x28uy }
+            "TAB", { Modifier = 0uy; Key = 0x2Buy }
+            "ESC", { Modifier = 0uy; Key = 0x29uy }
+            "ESCAPE", { Modifier = 0uy; Key = 0x29uy }
+            "DEL", { Modifier = 0uy; Key = 0x4Cuy }
+            "DELETE", { Modifier = 0uy; Key = 0x4Cuy }
+            "UP", { Modifier = 0uy; Key = 0x52uy }
+            "DOWN", { Modifier = 0uy; Key = 0x51uy }
+            "LEFT", { Modifier = 0uy; Key = 0x50uy }
+            "RIGHT", { Modifier = 0uy; Key = 0x4Fuy }
+            "HOME", { Modifier = 0uy; Key = 0x4Auy }
+            "END", { Modifier = 0uy; Key = 0x4Duy }
+            "PAGEUP", { Modifier = 0uy; Key = 0x4Buy }
+            "PAGEDOWN", { Modifier = 0uy; Key = 0x4Euy }
+        ]
+        |> dict
+
+    let private tryLookup layout (c: char) =
+        let map =
+            match layout with
+            | En -> keyMapUs
+            | De -> keyMapDe
+
+        match map.TryGetValue c with
         | true, entry -> Some entry
         | _ -> None
 
-    let toHid (c: char) =
+    let tryGetModifierToken (token: string) =
+        let key = token.Trim().ToUpperInvariant()
+        match modifierMap.TryGetValue key with
+        | true, value -> Some value
+        | _ -> None
+
+    let tryGetSpecialToken (token: string) =
+        let key = token.Trim().ToUpperInvariant()
+        match modifierMap.TryGetValue key with
+        | true, value -> Some { Modifier = value; Key = 0uy }
+        | _ ->
+            match specialKeyMap.TryGetValue key with
+            | true, entry -> Some entry
+            | _ -> None
+
+    let toHid layout (c: char) =
         let normalized =
             match c with
             | '\r' -> '\n'
@@ -98,9 +217,9 @@ module HidMapping =
 
         if Char.IsLetter normalized && Char.IsUpper normalized then
             let lower = Char.ToLowerInvariant normalized
-            match tryLookup lower with
+            match tryLookup layout lower with
             | Some baseEntry ->
-                Some { baseEntry with Modifier = baseEntry.Modifier ||| uppercaseMask }
+                Some { baseEntry with Modifier = baseEntry.Modifier ||| shiftMask }
             | None -> None
         else
-            tryLookup normalized
+            tryLookup layout normalized

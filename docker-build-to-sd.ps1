@@ -68,6 +68,8 @@ services:
     image: $ReceiverImage
     privileged: true
     network_mode: host
+    environment:
+      - RECEIVER_LAYOUT=en
     devices:
       - /dev/hidg0:/dev/hidg0
     command: ["$Port"]

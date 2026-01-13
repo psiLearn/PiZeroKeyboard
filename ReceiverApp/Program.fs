@@ -12,7 +12,8 @@ open ReceiverApp.TextProcessor
 type Options =
     { Port: int
       Emulate: bool
-      HidPath: string }
+      HidPath: string
+      Layout: HidMapping.KeyboardLayout }
 
 let defaultHidPath = "/dev/hidg0"
 
@@ -20,6 +21,13 @@ let parseOptions (argv: string[]) =
     let mutable port = 5000
     let mutable emulate = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
     let mutable hidPath = defaultHidPath
+    let defaultLayout =
+        Environment.GetEnvironmentVariable "RECEIVER_LAYOUT"
+        |> Option.ofObj
+        |> Option.bind HidMapping.tryParseLayout
+        |> Option.defaultValue HidMapping.KeyboardLayout.En
+
+    let mutable layout = defaultLayout
 
     for arg in argv do
         match arg with
@@ -27,6 +35,11 @@ let parseOptions (argv: string[]) =
         | "--no-emulate" -> emulate <- false
         | _ when arg.StartsWith("--hid-path=", StringComparison.OrdinalIgnoreCase) ->
             hidPath <- arg.Substring("--hid-path=".Length)
+        | _ when arg.StartsWith("--layout=", StringComparison.OrdinalIgnoreCase) ->
+            let value = arg.Substring("--layout=".Length)
+            match HidMapping.tryParseLayout value with
+            | Some parsed -> layout <- parsed
+            | None -> printfn "Unknown layout '%s'. Supported: en, de." value
         | _ ->
             match Int32.TryParse arg with
             | true, value -> port <- value
@@ -34,7 +47,8 @@ let parseOptions (argv: string[]) =
 
     { Port = port
       Emulate = emulate
-      HidPath = hidPath }
+      HidPath = hidPath
+      Layout = layout }
 
 let openHidStream path =
     printfn "Waiting for HID device at %s..." path
@@ -108,7 +122,12 @@ let main argv =
     if options.Emulate then
         printfn "Running in emulate mode. Incoming text will be displayed instead of typing."
     else
-        printfn "Using HID device at %s" options.HidPath
+        let layoutLabel =
+            match options.Layout with
+            | HidMapping.KeyboardLayout.En -> "en"
+            | HidMapping.KeyboardLayout.De -> "de"
+
+        printfn "Using HID device at %s (layout: %s)" options.HidPath layoutLabel
 
     let rec runLoop send =
         try
@@ -123,7 +142,7 @@ let main argv =
             if options.Emulate then
                 printfn "[EMULATED OUTPUT]\n%s" text
 
-            TextProcessor.processText send logUnsupported text
+            TextProcessor.processText send logUnsupported options.Layout text
         with ex ->
             eprintfn "Error while processing client: %s" ex.Message
             Thread.Sleep 500

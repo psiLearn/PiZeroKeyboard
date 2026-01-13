@@ -69,6 +69,32 @@ Why 32-bit? The Docker images in this repo are built for `linux/arm/v7`, which m
 1. Start the receiver on the Pi (with the HID gadget active).
 2. Launch the sender web UI with `dotnet run --project SenderApp -- 192.168.50.10 5000` and open the logged URL (defaults to `http://localhost:8080`), or send a single payload with `dotnet run --project SenderApp -- 192.168.50.10 5000 "Hello world!"`.
 3. When using the web UI, paste your text, press **Send**, and the text will be replayed as keystrokes on the USB-connected host.
+4. The sender UI shows the Raspberry Pi USB status; **connected (configured)** means the Pi is plugged into the host.
+5. The sender UI lets you pick the keyboard layout (en/de). It sends a `{LAYOUT=..}` token before your text so the receiver can map correctly.
+
+### Special keys
+
+You can embed special key tokens in the text you send. Tokens are case-insensitive and wrapped in braces:
+
+- `{BACKSPACE}`, `{ENTER}`, `{TAB}`, `{ESC}`
+- `{DEL}`, `{UP}`, `{DOWN}`, `{LEFT}`, `{RIGHT}`, `{HOME}`, `{END}`, `{PAGEUP}`, `{PAGEDOWN}`
+- `{WIN}`, `{CTRL}`, `{ALT}`, `{SHIFT}` (modifier-only keys)
+
+Use `{{` and `}}` to send literal `{` or `}` characters.
+
+For key chords, use `+` inside a token, for example:
+
+- `{CTRL+C}`, `{CTRL+ALT+DEL}`, `{ALT+TAB}`
+- `{SHIFT+WIN+S}` (modifiers + key)
+
+### Keyboard layout (en/de)
+
+The receiver can target different host keyboard layouts:
+
+- `--layout=en` (default, US QWERTY)
+- `--layout=de` (German QWERTZ, includes `äöüß`)
+
+You can also set `RECEIVER_LAYOUT=en|de` as an environment variable.
 
 ## Testing & coverage
 
