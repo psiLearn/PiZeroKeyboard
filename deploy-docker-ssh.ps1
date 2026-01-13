@@ -146,6 +146,7 @@ services:
       - SENDER_TARGET_PORT=$Port
       - SENDER_WEB_PORT=8080
       - SENDER_USB_STATE_PATH=/sys/class/udc/3f980000.usb/state
+      - SENDER_LAYOUT_TOKEN=true
 "@
 Set-Content -Path $composeTemp -Value $composeContent -Encoding ASCII
 

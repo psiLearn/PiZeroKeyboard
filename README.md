@@ -70,7 +70,7 @@ Why 32-bit? The Docker images in this repo are built for `linux/arm/v7`, which m
 2. Launch the sender web UI with `dotnet run --project SenderApp -- 192.168.50.10 5000` and open the logged URL (defaults to `http://localhost:8080`), or send a single payload with `dotnet run --project SenderApp -- 192.168.50.10 5000 "Hello world!"`.
 3. When using the web UI, paste your text, press **Send**, and the text will be replayed as keystrokes on the USB-connected host.
 4. The sender UI shows the Raspberry Pi USB status; **connected (configured)** means the Pi is plugged into the host.
-5. The sender UI lets you pick the keyboard layout (en/de). It sends a `{LAYOUT=..}` token before your text so the receiver can map correctly.
+5. The sender UI lets you pick the keyboard layout (en/de). When `SENDER_LAYOUT_TOKEN=true`, it sends a `{LAYOUT=..}` token before your text so the receiver can map correctly.
 
 ### Special keys
 
@@ -81,6 +81,8 @@ You can embed special key tokens in the text you send. Tokens are case-insensiti
 - `{WIN}`, `{CTRL}`, `{ALT}`, `{SHIFT}` (modifier-only keys)
 
 Use `{{` and `}}` to send literal `{` or `}` characters.
+
+Note: `{LAYOUT=..}` tokens are only understood by the .NET receiver. If you use the Python receiver under `pi-zero/`, disable layout prefixing with `SENDER_LAYOUT_TOKEN=false`.
 
 For key chords, use `+` inside a token, for example:
 

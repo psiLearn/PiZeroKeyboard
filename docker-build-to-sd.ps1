@@ -86,6 +86,7 @@ services:
       - SENDER_TARGET_IP=127.0.0.1
       - SENDER_TARGET_PORT=$Port
       - SENDER_WEB_PORT=8080
+      - SENDER_LAYOUT_TOKEN=true
 "@
 Set-Content -Path (Join-Path $targetDir "docker-compose.yml") -Value $composeContent -Encoding ASCII
 

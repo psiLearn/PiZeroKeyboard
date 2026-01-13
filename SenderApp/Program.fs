@@ -47,6 +47,18 @@ let envOrDefault name fallback =
     | null | "" -> fallback
     | value -> value
 
+let parseBool defaultValue (value: string) =
+    match value.Trim().ToLowerInvariant() with
+    | "1"
+    | "true"
+    | "yes"
+    | "on" -> true
+    | "0"
+    | "false"
+    | "no"
+    | "off" -> false
+    | _ -> defaultValue
+
 let normalizeLayout defaultLayout (value: string) =
     if String.IsNullOrWhiteSpace value then
         defaultLayout
@@ -63,6 +75,10 @@ let normalizeLayout defaultLayout (value: string) =
 let getDefaultLayout () =
     envOrDefault "SENDER_LAYOUT" "en"
     |> normalizeLayout "en"
+
+let shouldSendLayoutToken () =
+    envOrDefault "SENDER_LAYOUT_TOKEN" "false"
+    |> parseBool false
 
 let applyLayoutToken (layout: string) (text: string) =
     if String.IsNullOrWhiteSpace layout then
@@ -273,6 +289,7 @@ let sendHandler (settings: SenderSettings) : HttpHandler =
         task {
             let isMobile = isMobileClient ctx
             let defaultLayout = getDefaultLayout ()
+            let sendLayoutToken = shouldSendLayoutToken ()
             let! form = ctx.BindFormAsync<SendRequest>()
 
             let text =
@@ -294,7 +311,11 @@ let sendHandler (settings: SenderSettings) : HttpHandler =
                 return! (renderPage settings model) next ctx
             else
                 let logger = ctx.GetLogger()
-                let payload = applyLayoutToken layout text
+                let payload =
+                    if sendLayoutToken then
+                        applyLayoutToken layout text
+                    else
+                        text
                 let! result = sendToReceiver logger settings payload
 
                 match result with
@@ -395,6 +416,7 @@ let usage () =
     printfn "  SENDER_WEB_URLS          Semicolon-delimited list of URLs for the web UI (overrides port)"
     printfn "  SENDER_USB_STATE_PATH    Optional UDC state file path (default: /sys/class/udc/*/state)"
     printfn "  SENDER_LAYOUT            Default layout for the UI (en or de, default: en)"
+    printfn "  SENDER_LAYOUT_TOKEN      Prefix outgoing text with {LAYOUT=...} (default: false)"
     1
 
 [<EntryPoint>]

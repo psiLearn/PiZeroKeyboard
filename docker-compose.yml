@@ -23,3 +23,4 @@ services:
       - SENDER_TARGET_PORT=5000
       - SENDER_WEB_PORT=8080
       - SENDER_USB_STATE_PATH=/sys/class/udc/3f980000.usb/state
+      - SENDER_LAYOUT_TOKEN=true

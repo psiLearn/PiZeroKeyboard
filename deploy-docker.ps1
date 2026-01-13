@@ -123,6 +123,7 @@ services:
       - SENDER_TARGET_IP=127.0.0.1
       - SENDER_TARGET_PORT=${Port}
       - SENDER_WEB_PORT=8080
+      - SENDER_LAYOUT_TOKEN=true
 "@
 
 $composeTemp = Join-Path ([System.IO.Path]::GetTempPath()) ("linuxkey-compose-" + [System.Guid]::NewGuid().ToString("N") + ".yml")
