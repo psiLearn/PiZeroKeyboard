@@ -134,6 +134,30 @@ let readUsbStatus () =
             { Text = sprintf "Raspberry Pi USB: unknown (%s)" ex.Message
               CssClass = "unknown" }
 
+let jsonEscape (value: string) =
+    if isNull value then
+        ""
+    else
+        value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\r", "\\r")
+            .Replace("\n", "\\n")
+            .Replace("\t", "\\t")
+
+let statusHandler : HttpHandler =
+    fun next ctx ->
+        task {
+            let status = readUsbStatus ()
+            let payload =
+                sprintf
+                    "{\"text\":\"%s\",\"cssClass\":\"%s\"}"
+                    (jsonEscape status.Text)
+                    (jsonEscape status.CssClass)
+            ctx.SetHttpHeader("Content-Type", "application/json; charset=utf-8")
+            return! text payload next ctx
+        }
+
 let isMobileClient (ctx: HttpContext) =
     match ctx.Request.Headers.TryGetValue "User-Agent" with
     | true, values ->
@@ -194,6 +218,13 @@ let renderPage (settings: SenderSettings) (model: IndexViewModel) : HttpHandler 
         else
             [ _value value ]
 
+    let specialKeyButton label token =
+        button
+            [ _type "button"
+              _class "secondary"
+              attr "data-token" token ]
+            [ str label ]
+
     let formNodes =
         [ div
               [ _class "layout-row" ]
@@ -203,8 +234,25 @@ let renderPage (settings: SenderSettings) (model: IndexViewModel) : HttpHandler 
                     option (layoutOptionAttrs "de") [ str "Deutsch (DE)" ]
                 ] ]
           textarea
-              [ _name "text"; _placeholder "Paste text here..." ]
+              [ _id "text"; _name "text"; _placeholder "Paste text here..." ]
               [ str model.Text ]
+          div [ _class "special-keys" ] [
+              specialKeyButton "Enter" "{ENTER}"
+              specialKeyButton "Tab" "{TAB}"
+              specialKeyButton "Backspace" "{BACKSPACE}"
+              specialKeyButton "Esc" "{ESC}"
+              specialKeyButton "Delete" "{DELETE}"
+              specialKeyButton "Win" "{WIN}"
+              specialKeyButton "Ctrl+C" "{CTRL+C}"
+              specialKeyButton "Ctrl+V" "{CTRL+V}"
+              specialKeyButton "Ctrl+X" "{CTRL+X}"
+              specialKeyButton "Ctrl+Z" "{CTRL+Z}"
+              specialKeyButton "Ctrl+A" "{CTRL+A}"
+              specialKeyButton "Up" "{UP}"
+              specialKeyButton "Down" "{DOWN}"
+              specialKeyButton "Left" "{LEFT}"
+              specialKeyButton "Right" "{RIGHT}"
+          ]
           p [ _class "hint" ]
               [ str "Special keys: "
                 code [] [ str "{BACKSPACE}" ]
@@ -219,7 +267,7 @@ let renderPage (settings: SenderSettings) (model: IndexViewModel) : HttpHandler 
                 str " and "
                 code [] [ str "}}" ]
                 str " for literal braces." ]
-          button [ _type "submit" ] [ str "Send" ] ]
+          button [ _type "submit"; _class "primary" ] [ str "Send" ] ]
 
     html [] [
         head [] [
@@ -233,8 +281,11 @@ body { font-family: 'Segoe UI', sans-serif; margin: 2rem auto; max-width: 48rem;
 h1 { color: #0284c7; }
 form { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
 textarea { min-height: 12rem; padding: 1rem; font-size: 1rem; font-family: 'Fira Code', Consolas, monospace; border: 1px solid #cbd5e1; border-radius: 0.5rem; background: white; color: inherit; }
-button { padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: none; background: #0284c7; color: white; font-size: 1rem; cursor: pointer; align-self: flex-start; }
-button:hover { background: #0369a1; }
+button { padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: none; font-size: 1rem; cursor: pointer; }
+button.primary { background: #0284c7; color: white; align-self: flex-start; }
+button.primary:hover { background: #0369a1; }
+button.secondary { background: #475569; color: white; }
+button.secondary:hover { background: #334155; }
 .hint { margin: 0; font-size: 0.85rem; color: #64748b; line-height: 1.4; }
 .hint code { background: #e2e8f0; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-family: 'Fira Code', Consolas, monospace; }
 .alert { padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid transparent; }
@@ -249,23 +300,80 @@ button:hover { background: #0369a1; }
 .usb-status.disconnected { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
 .usb-status.pending { background: #fef9c3; border-color: #fde047; color: #92400e; }
 .usb-status.unknown { background: #e2e8f0; border-color: #cbd5e1; color: #334155; }
+.status-bar { margin-top: 0.5rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.status-bar button { padding: 0.45rem 0.85rem; font-size: 0.85rem; }
+.special-keys { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.special-keys button { padding: 0.4rem 0.7rem; font-size: 0.85rem; }
 body.mobile { margin: 1rem auto; padding: 0 1rem; }
 body.mobile h1 { font-size: 1.6rem; }
 body.mobile textarea { min-height: 10rem; font-size: 1rem; }
-body.mobile button { width: 100%; align-self: stretch; }
+body.mobile button.primary { width: 100%; align-self: stretch; }
 @media (max-width: 720px) {
   body { margin: 1rem auto; padding: 0 1rem; }
   h1 { font-size: 1.6rem; }
   textarea { min-height: 10rem; font-size: 1rem; }
-  button { width: 100%; align-self: stretch; }
+  button.primary { width: 100%; align-self: stretch; }
 }
+"""
+            ]
+            script [] [
+                rawText
+                    """
+document.addEventListener('DOMContentLoaded', () => {
+  const statusEl = document.getElementById('usb-status');
+  const refreshBtn = document.getElementById('refresh-status');
+
+  const setStatus = (text, cssClass) => {
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.className = `usb-status ${cssClass || 'unknown'}`;
+  };
+
+  const refreshStatus = () => {
+    if (!statusEl) return;
+    if (refreshBtn) refreshBtn.disabled = true;
+    fetch('/status', { cache: 'no-store' })
+      .then((resp) => resp.ok ? resp.json() : Promise.reject(resp.status))
+      .then((data) => setStatus(data.text || 'Raspberry Pi USB: unknown', data.cssClass || 'unknown'))
+      .catch(() => setStatus('Raspberry Pi USB: unknown (refresh failed)', 'unknown'))
+      .finally(() => { if (refreshBtn) refreshBtn.disabled = false; });
+  };
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      refreshStatus();
+    });
+  }
+
+  const textarea = document.getElementById('text');
+  const insertToken = (token) => {
+    if (!textarea || !token) return;
+    const start = textarea.selectionStart ?? textarea.value.length;
+    const end = textarea.selectionEnd ?? textarea.value.length;
+    textarea.value = `${textarea.value.slice(0, start)}${token}${textarea.value.slice(end)}`;
+    const caret = start + token.length;
+    textarea.setSelectionRange(caret, caret);
+    textarea.focus();
+  };
+
+  document.querySelectorAll('[data-token]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      insertToken(button.getAttribute('data-token'));
+    });
+  });
+});
 """
             ]
         ]
         body bodyAttrs
             ([ h1 [] [ str "LinuxKey Sender" ]
                p [ _class "target" ] [ str (sprintf "Target device: %s:%d" settings.TargetIp settings.TargetPort) ]
-               div [ _class (sprintf "usb-status %s" model.UsbStatus.CssClass) ] [ str model.UsbStatus.Text ] ]
+               div [ _class "status-bar" ] [
+                   div [ _id "usb-status"; _class (sprintf "usb-status %s" model.UsbStatus.CssClass) ] [ str model.UsbStatus.Text ]
+                   button [ _type "button"; _id "refresh-status"; _class "secondary" ] [ str "Refresh status" ]
+               ] ]
              @ statusNodes
              @ [ form
                      [ _method "post"; _action "/send" ]
@@ -343,6 +451,7 @@ let webApp settings =
     choose [
         GET >=> route "/" >=> indexHandler settings
         POST >=> route "/send" >=> sendHandler settings
+        GET >=> route "/status" >=> statusHandler
         GET >=> route "/healthz" >=> text "OK"
     ]
 
