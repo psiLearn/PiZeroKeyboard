@@ -51,66 +51,80 @@ module Views =
               ] ]
 
     let renderSpecialKeys () =
-        let specialKeyButton label token =
+        let specialKeyButton label token extraClass =
+            let className =
+                if String.IsNullOrWhiteSpace extraClass then
+                    "secondary key"
+                else
+                    sprintf "secondary key %s" extraClass
+
             button
                 [ _type "button"
-                  _class "secondary"
+                  _class className
                   attr "data-token" token ]
                 [ str label ]
 
-        div [ _class "special-keys" ] [
-            div [ _class "desktop-only" ] [
-                div [ _class "key-row" ] [
-                    specialKeyButton "F1" "{F1}"
-                    specialKeyButton "F2" "{F2}"
-                    specialKeyButton "F3" "{F3}"
-                    specialKeyButton "F4" "{F4}"
-                    specialKeyButton "F5" "{F5}"
-                    specialKeyButton "F6" "{F6}"
-                    specialKeyButton "F7" "{F7}"
-                    specialKeyButton "F8" "{F8}"
-                    specialKeyButton "F9" "{F9}"
-                    specialKeyButton "F10" "{F10}"
-                    specialKeyButton "F11" "{F11}"
-                    specialKeyButton "F12" "{F12}"
+            div [ _class "special-keys" ] [
+                div [ _class "desktop-only" ] [
+                div [ _class "key-row function-row" ] [
+                    specialKeyButton "F1" "{F1}" ""
+                    specialKeyButton "F2" "{F2}" ""
+                    specialKeyButton "F3" "{F3}" ""
+                    specialKeyButton "F4" "{F4}" ""
+                    specialKeyButton "F5" "{F5}" ""
+                    specialKeyButton "F6" "{F6}" ""
+                    specialKeyButton "F7" "{F7}" ""
+                    specialKeyButton "F8" "{F8}" ""
+                    specialKeyButton "F9" "{F9}" ""
+                    specialKeyButton "F10" "{F10}" ""
+                    specialKeyButton "F11" "{F11}" ""
+                    specialKeyButton "F12" "{F12}" ""
                 ]
-                div [ _class "key-row" ] [
-                    specialKeyButton "Print" "{PRINT}"
-                    specialKeyButton "Scroll" "{SCROLLLOCK}"
-                    specialKeyButton "Pause" "{PAUSE}"
+                div [ _class "key-row utility-row" ] [
+                    specialKeyButton "Print" "{PRINT}" ""
+                    specialKeyButton "Scroll" "{SCROLLLOCK}" ""
+                    specialKeyButton "Pause" "{PAUSE}" ""
                 ]
-                div [ _class "key-row" ] [
-                    specialKeyButton "Ins" "{INSERT}"
-                    specialKeyButton "Home" "{HOME}"
-                    specialKeyButton "End" "{END}"
-                    specialKeyButton "PgUp" "{PAGEUP}"
-                    specialKeyButton "PgDn" "{PAGEDOWN}"
+                div [ _class "key-row nav-row" ] [
+                    specialKeyButton "Ins" "{INSERT}" ""
+                    specialKeyButton "Home" "{HOME}" ""
+                    specialKeyButton "End" "{END}" ""
+                    specialKeyButton "PgUp" "{PAGEUP}" ""
+                    specialKeyButton "PgDn" "{PAGEDOWN}" ""
                 ]
             ]
-            div [ _class "key-row" ] [
-                specialKeyButton "Esc" "{ESC}"
-                specialKeyButton "Tab" "{TAB}"
-                specialKeyButton "Enter" "{ENTER}"
-                specialKeyButton "Backspace" "{BACKSPACE}"
-                specialKeyButton "Delete" "{DELETE}"
+            div [ _class "keyboard-block" ] [
+                div [ _class "key-row keyboard-row" ] [
+                    specialKeyButton "Esc" "{ESC}" ""
+                    specialKeyButton "Tab" "{TAB}" "wide-2"
+                    specialKeyButton "Enter" "{ENTER}" "wide-2"
+                    specialKeyButton "Backspace" "{BACKSPACE}" "wide-3"
+                    specialKeyButton "Delete" "{DELETE}" "wide-2"
+                ]
+                div [ _class "key-row keyboard-row" ] [
+                    specialKeyButton "Ctrl" "{CTRL}" "wide-2"
+                    specialKeyButton "Win" "{WIN}" "wide-2"
+                    specialKeyButton "Alt" "{ALT}" "wide-2"
+                    specialKeyButton "Space" " " "wide-4"
+                    specialKeyButton "Shift" "{SHIFT}" "wide-2"
+                ]
             ]
-            div [ _class "key-row" ] [
-                specialKeyButton "Ctrl+A" "{CTRL+A}"
-                specialKeyButton "Ctrl+C" "{CTRL+C}"
-                specialKeyButton "Ctrl+V" "{CTRL+V}"
-                specialKeyButton "Ctrl+X" "{CTRL+X}"
-                specialKeyButton "Ctrl+Z" "{CTRL+Z}"
-                specialKeyButton "Win" "{WIN}"
+            div [ _class "key-row shortcut-row" ] [
+                specialKeyButton "Ctrl+A" "{CTRL+A}" ""
+                specialKeyButton "Ctrl+C" "{CTRL+C}" ""
+                specialKeyButton "Ctrl+V" "{CTRL+V}" ""
+                specialKeyButton "Ctrl+X" "{CTRL+X}" ""
+                specialKeyButton "Ctrl+Z" "{CTRL+Z}" ""
             ]
-            div [ _class "key-row" ] [
+            div [ _class "key-row arrow-block" ] [
                 div [ _class "arrow-pad" ] [
                     div [ _class "arrow-row" ] [
-                        specialKeyButton "Up" "{UP}"
+                        specialKeyButton "Up" "{UP}" ""
                     ]
                     div [ _class "arrow-row" ] [
-                        specialKeyButton "Left" "{LEFT}"
-                        specialKeyButton "Down" "{DOWN}"
-                        specialKeyButton "Right" "{RIGHT}"
+                        specialKeyButton "Left" "{LEFT}" ""
+                        specialKeyButton "Down" "{DOWN}" ""
+                        specialKeyButton "Right" "{RIGHT}" ""
                     ]
                 ]
             ]

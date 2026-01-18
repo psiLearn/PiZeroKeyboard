@@ -45,9 +45,22 @@ button.secondary:hover { background: #334155; }
 .caps-dot.off { background: var(--caps-off); box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2); }
 .caps-dot.unknown { background: var(--unknown); box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.2); }
 .special-keys { display: flex; flex-direction: column; gap: 0.6rem; }
+.keyboard-block { display: flex; flex-direction: column; gap: 0.4rem; }
 .desktop-only { display: flex; flex-direction: column; gap: 0.5rem; }
 .mobile .desktop-only { display: none; }
 .key-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.keyboard-row { flex-wrap: wrap; }
+.shortcut-row { flex-wrap: wrap; }
+.function-row { width: 100%; }
+.function-row .key { flex: 1 1 0; }
+.utility-row,
+.nav-row { justify-content: flex-end; }
+.key { min-width: 2.4rem; }
+.keyboard-row .key,
+.shortcut-row .key { flex: 1 1 0; }
+.key.wide-2 { flex: 2 1 0; }
+.key.wide-3 { flex: 3 1 0; }
+.key.wide-4 { flex: 4 1 0; }
 .special-keys button { padding: 0.35rem 0.6rem; font-size: 0.85rem; }
 .arrow-pad { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; }
 .arrow-row { display: flex; gap: 0.4rem; justify-content: center; }

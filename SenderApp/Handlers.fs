@@ -46,11 +46,12 @@ module Handlers =
                     form.Text
                     |> Option.ofObj
                     |> Option.defaultValue ""
-                    |> fun t -> t.TrimEnd()
+
+                let textForCheck = text.Trim()
 
                 let layout = normalizeLayout defaultLayout form.Layout
 
-                if String.IsNullOrWhiteSpace text then
+                if String.IsNullOrWhiteSpace textForCheck then
                     let model =
                         { Status = Failure "Please enter some text before sending."
                           Text = ""
