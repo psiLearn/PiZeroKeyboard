@@ -8,6 +8,7 @@ module UsbStatusWebSocket =
     open System.Threading.Tasks
     open Giraffe
     open Microsoft.AspNetCore.Http
+    open SenderApp.CapsLockService
     open SenderApp.UsbStatusPayload
     open SenderApp.UsbStatusService
     open SenderApp.UsbStatusWatchers
@@ -38,7 +39,11 @@ module UsbStatusWebSocket =
                             do! sendWebSocketText socket initialPayload cancellationToken
                             lastPayload <- initialPayload
 
-                            let watchers = UsbStatusWatchers.create tryGetUsbStatePath (getUsbEventPath ())
+                            let watchers =
+                                UsbStatusWatchers.create
+                                    tryGetUsbStatePath
+                                    (getUsbEventPath ())
+                                    (getCapsLockPath ())
                             try
                                 watchers.RefreshStateWatcher ()
 

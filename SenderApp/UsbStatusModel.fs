@@ -3,7 +3,7 @@ namespace SenderApp
 module UsbStatusModel =
     open System
 
-    let statusFromState (state: string) =
+    let statusFromState (state: string) : UsbStatus =
         let normalized =
             if isNull state then
                 ""
@@ -29,10 +29,10 @@ module UsbStatusModel =
             { Text = sprintf "Raspberry Pi USB: %s" other
               CssClass = "unknown" }
 
-    let statusMissingStateFile () =
+    let statusMissingStateFile () : UsbStatus =
         { Text = "Raspberry Pi USB: unknown (state file not found)"
           CssClass = "unknown" }
 
-    let statusReadError (message: string) =
+    let statusReadError (message: string) : UsbStatus =
         { Text = sprintf "Raspberry Pi USB: unknown (%s)" message
           CssClass = "unknown" }

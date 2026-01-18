@@ -5,6 +5,7 @@ module Handlers =
     open Microsoft.AspNetCore.Http
     open Giraffe
     open SenderApp.Configuration
+    open SenderApp.CapsLockService
     open SenderApp.ReceiverClient
     open SenderApp.UsbStatusService
     open SenderApp.Views
@@ -27,6 +28,7 @@ module Handlers =
                 { Status = Idle
                   Text = ""
                   UsbStatus = readUsbStatus ()
+                  CapsLock = readCapsLockStatus ()
                   IsMobile = isMobileClient ctx
                   Layout = layout }
             renderPage settings model showDevInfo next ctx
@@ -53,6 +55,7 @@ module Handlers =
                         { Status = Failure "Please enter some text before sending."
                           Text = ""
                           UsbStatus = readUsbStatus ()
+                          CapsLock = readCapsLockStatus ()
                           IsMobile = isMobile
                           Layout = layout }
 
@@ -72,6 +75,7 @@ module Handlers =
                             { Status = Success bytes
                               Text = ""
                               UsbStatus = readUsbStatus ()
+                              CapsLock = readCapsLockStatus ()
                               IsMobile = isMobile
                               Layout = layout }
 
@@ -81,6 +85,7 @@ module Handlers =
                             { Status = Failure message
                               Text = text
                               UsbStatus = readUsbStatus ()
+                              CapsLock = readCapsLockStatus ()
                               IsMobile = isMobile
                               Layout = layout }
 

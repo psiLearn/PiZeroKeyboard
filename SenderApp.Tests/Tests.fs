@@ -1,5 +1,6 @@
 module SenderApp.Tests
 
+open SenderApp.CapsLockModel
 open SenderApp.UsbStatusModel
 open Xunit
 
@@ -58,3 +59,24 @@ let ``statusReadError returns unknown`` () =
     let result = statusReadError "boom"
     Assert.Equal("Raspberry Pi USB: unknown (boom)", result.Text)
     Assert.Equal("unknown", result.CssClass)
+
+[<Fact>]
+let ``caps lock maps on`` () =
+    let result = statusFromValue "on"
+    Assert.Equal("Caps Lock: on", result.Text)
+    Assert.Equal("on", result.CssClass)
+
+[<Fact>]
+let ``caps lock maps off`` () =
+    let result = statusFromValue "off"
+    Assert.Equal("Caps Lock: off", result.Text)
+    Assert.Equal("off", result.CssClass)
+
+[<Fact>]
+let ``caps lock maps unknown`` () =
+    let empty = statusFromValue ""
+    let other = statusFromValue "mystery"
+    Assert.Equal("Caps Lock: unknown", empty.Text)
+    Assert.Equal("unknown", empty.CssClass)
+    Assert.Equal("Caps Lock: mystery", other.Text)
+    Assert.Equal("unknown", other.CssClass)

@@ -37,6 +37,7 @@ module Startup =
                     webHostBuilder
                         .UseUrls(urls |> List.toArray)
                         .Configure(fun app ->
+                            app.UseStaticFiles() |> ignore
                             app.UseGiraffe(webApp settings))
                     |> ignore)
 
@@ -61,6 +62,7 @@ module Startup =
         printfn "  SENDER_WEB_PORT          Port for the web UI (default: 8080)"
         printfn "  SENDER_WEB_URLS          Semicolon-delimited list of URLs for the web UI (overrides port)"
         printfn "  SENDER_USB_STATE_PATH    Optional UDC state file path (default: /sys/class/udc/*/state)"
+        printfn "  SENDER_CAPSLOCK_PATH     Optional Caps Lock status file (default: /run/linuxkey/capslock)"
         printfn "  SENDER_LAYOUT            Default layout for the UI (en or de, default: en)"
         printfn "  SENDER_LAYOUT_TOKEN      Prefix outgoing text with {LAYOUT=...} (default: false)"
         1

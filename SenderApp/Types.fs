@@ -9,10 +9,15 @@ type UsbStatus =
     { Text: string
       CssClass: string }
 
+type CapsLockStatus =
+    { Text: string
+      CssClass: string }
+
 type IndexViewModel =
     { Status: SendStatus
       Text: string
       UsbStatus: UsbStatus
+      CapsLock: CapsLockStatus
       IsMobile: bool
       Layout: string }
 

@@ -33,7 +33,7 @@ module UsbStatusWatchers =
     let private disposeWatcher (watcher: FileSystemWatcher option) =
         watcher |> Option.iter (fun entry -> entry.Dispose())
 
-    let create (tryGetStatePath: unit -> string option) (eventPath: string option) =
+    let create (tryGetStatePath: unit -> string option) (eventPath: string option) (capsPath: string option) =
         let channel = createStatusChannel ()
         let enqueue () = channel.Writer.TryWrite(()) |> ignore
 
@@ -53,6 +53,18 @@ module UsbStatusWatchers =
 
         let eventWatcher =
             match eventPath with
+            | None -> None
+            | Some path ->
+                let directory = Path.GetDirectoryName path
+                let fileName = Path.GetFileName path
+                tryCreateWatcher
+                    directory
+                    fileName
+                    (NotifyFilters.FileName ||| NotifyFilters.LastWrite ||| NotifyFilters.CreationTime)
+                    enqueue
+
+        let capsWatcher =
+            match capsPath with
             | None -> None
             | Some path ->
                 let directory = Path.GetDirectoryName path
@@ -95,6 +107,7 @@ module UsbStatusWatchers =
             disposeWatcher udcWatcher
             disposeWatcher devWatcher
             disposeWatcher eventWatcher
+            disposeWatcher capsWatcher
 
         { Channel = channel
           RefreshStateWatcher = refreshStateWatcher

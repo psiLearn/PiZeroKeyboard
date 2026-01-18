@@ -13,10 +13,12 @@ type Options =
     { Port: int
       Emulate: bool
       HidPath: string
-      Layout: HidMapping.KeyboardLayout }
+      Layout: HidMapping.KeyboardLayout
+      CapsLockPath: string }
 
 let defaultHidPath = "/dev/hidg0"
 let readTimeoutMs = 30000
+let defaultCapsLockPath = "/run/linuxkey/capslock"
 
 let parseOptions (argv: string[]) =
     let mutable port = 5000
@@ -29,6 +31,10 @@ let parseOptions (argv: string[]) =
         |> Option.defaultValue HidMapping.KeyboardLayout.En
 
     let mutable layout = defaultLayout
+    let capsLockPath =
+        match Environment.GetEnvironmentVariable "RECEIVER_CAPSLOCK_PATH" with
+        | null | "" -> defaultCapsLockPath
+        | value -> value
 
     for arg in argv do
         match arg with
@@ -49,7 +55,8 @@ let parseOptions (argv: string[]) =
     { Port = port
       Emulate = emulate
       HidPath = hidPath
-      Layout = layout }
+      Layout = layout
+      CapsLockPath = capsLockPath }
 
 let openHidStream path =
     printfn "Waiting for HID device at %s..." path
@@ -60,6 +67,22 @@ let openHidStream path =
         else
             try
                 new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite)
+            with
+            | :? IOException
+            | :? UnauthorizedAccessException ->
+                Thread.Sleep 1000
+                loop ()
+    loop ()
+
+let openHidReadStream path =
+    printfn "Waiting for HID output reports at %s..." path
+    let rec loop () =
+        if not (File.Exists path) then
+            Thread.Sleep 1000
+            loop ()
+        else
+            try
+                new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
             with
             | :? IOException
             | :? UnauthorizedAccessException ->
@@ -111,12 +134,54 @@ let createSender hidPath =
         writeReport release
         Thread.Sleep 5
 
+let writeCapsLockState (path: string) isOn =
+    let value = if isOn then "on" else "off"
+    let directory = Path.GetDirectoryName path
+    if not (String.IsNullOrWhiteSpace directory) then
+        Directory.CreateDirectory directory |> ignore
+    File.WriteAllText(path, value)
+
+let startCapsLockMonitor hidPath capsLockPath (cancellationToken: CancellationToken) =
+    let rec loop () =
+        try
+            use stream = openHidReadStream hidPath
+            stream.ReadTimeout <- 1000
+            let buffer = Array.zeroCreate<byte> 8
+            let mutable lastState: bool option = None
+            while not cancellationToken.IsCancellationRequested do
+                try
+                    let bytesRead = stream.Read(buffer, 0, buffer.Length)
+                    if bytesRead > 0 then
+                        // Bit 1 in the LED output report indicates Caps Lock.
+                        let capsOn = (buffer.[0] &&& 0x02uy) <> 0uy
+                        if lastState <> Some capsOn then
+                            writeCapsLockState capsLockPath capsOn
+                            lastState <- Some capsOn
+                with
+                | :? IOException -> ()
+        with ex ->
+            if not cancellationToken.IsCancellationRequested then
+                eprintfn "Caps Lock monitor error: %s" ex.Message
+                Thread.Sleep 1000
+                loop ()
+
+    if not (String.IsNullOrWhiteSpace capsLockPath) then
+        let thread = new Thread(ThreadStart(loop))
+        thread.IsBackground <- true
+        thread.Start()
+
 let logUnsupported c =
     printfn "Skipping unsupported char '%c' (0x%04X)" c (int c)
 
 [<EntryPoint>]
 let main argv =
     let options = parseOptions argv
+    use capsLockCts = new CancellationTokenSource()
+    Console.CancelKeyPress.Add(fun args ->
+        args.Cancel <- true
+        capsLockCts.Cancel())
+    AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> capsLockCts.Cancel())
+
     let listener = new TcpListener(IPAddress.Any, options.Port)
     listener.Start()
     printfn "Receiver listening on port %d" options.Port
@@ -129,6 +194,7 @@ let main argv =
             | HidMapping.KeyboardLayout.De -> "de"
 
         printfn "Using HID device at %s (layout: %s)" options.HidPath layoutLabel
+        startCapsLockMonitor options.HidPath options.CapsLockPath capsLockCts.Token
 
     let rec runLoop send =
         try

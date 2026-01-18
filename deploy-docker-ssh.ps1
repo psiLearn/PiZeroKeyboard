@@ -129,8 +129,11 @@ services:
     network_mode: host
     environment:
       - RECEIVER_LAYOUT=en
+      - RECEIVER_CAPSLOCK_PATH=/run/linuxkey/capslock
     devices:
       - /dev/hidg0:/dev/hidg0
+    volumes:
+      - /run/linuxkey:/run/linuxkey
     command: ["$Port"]
     restart: unless-stopped
 
@@ -146,7 +149,10 @@ services:
       - SENDER_TARGET_PORT=$Port
       - SENDER_WEB_PORT=8080
       - SENDER_USB_STATE_PATH=/sys/class/udc/3f980000.usb/state
+      - SENDER_CAPSLOCK_PATH=/run/linuxkey/capslock
       - SENDER_LAYOUT_TOKEN=true
+    volumes:
+      - /run/linuxkey:/run/linuxkey:ro
 "@
 Set-Content -Path $composeTemp -Value $composeContent -Encoding ASCII
 

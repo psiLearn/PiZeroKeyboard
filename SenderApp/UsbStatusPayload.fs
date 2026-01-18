@@ -3,20 +3,26 @@ namespace SenderApp
 module UsbStatusPayload =
     open System.Text.Json
     open Giraffe
+    open SenderApp.CapsLockService
     open SenderApp.UsbStatusService
 
     type StatusPayload =
         { Text: string
-          CssClass: string }
+          CssClass: string
+          CapsText: string
+          CapsCssClass: string }
 
     let private statusJsonOptions =
         JsonSerializerOptions(PropertyNamingPolicy = JsonNamingPolicy.CamelCase)
 
     let buildStatusPayload () =
         let status = readUsbStatus ()
+        let caps = readCapsLockStatus ()
         let payload =
             { Text = status.Text
-              CssClass = status.CssClass }
+              CssClass = status.CssClass
+              CapsText = caps.Text
+              CapsCssClass = caps.CssClass }
         JsonSerializer.Serialize(payload, statusJsonOptions)
 
     let statusHandler : HttpHandler =

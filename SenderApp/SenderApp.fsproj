@@ -9,6 +9,8 @@
     <Compile Include="Types.fs" />
     <Compile Include="Configuration.fs" />
     <Compile Include="UsbStatusModel.fs" />
+    <Compile Include="CapsLockModel.fs" />
+    <Compile Include="CapsLockService.fs" />
     <Compile Include="UsbStatusService.fs" />
     <Compile Include="UsbStatusPayload.fs" />
     <Compile Include="UsbStatusWatchers.fs" />
@@ -24,6 +26,12 @@
 
   <ItemGroup>
     <PackageReference Include="Giraffe" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="wwwroot\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
