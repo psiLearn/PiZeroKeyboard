@@ -4,7 +4,8 @@ Windows sender and Raspberry Pi Zero receiver written in F# for transmitting tex
 
 ## Projects
 
-- `SenderApp` – Windows console app that sends UTF-8 text to the Pi. Run with `dotnet run -- <pi-ip> <port> "text"`.
+- `SenderApp` - Windows console + web UI sender. Run `dotnet run -- <pi-ip> <port> "text"` for a one-off send, or `dotnet run -- <pi-ip> <port>` for the UI.
+- `SenderApp.Tests` - Sender unit tests (USB status mapping).
 - `ReceiverApp` – Raspberry Pi console app that listens for TCP connections, converts characters to HID codes, and writes them to `/dev/hidg0`.
 - `PiSetup/setup-hid-gadget.sh` – Helper script that configures the Pi Zero USB gadget as a keyboard (run once per boot as root).
 
@@ -37,7 +38,7 @@ dotnet build ReceiverApp
    - Optional: run `pi-zero/init-sd.ps1 -BootDrive E: -ForceDwc2` to apply these settings.
 3. Insert the SD card into the Pi Zero 2 W and boot. Find the IP (router/DHCP list).
 4. On Windows, deploy the Docker stack over SSH:
-   - `.\deploy-docker.ps1 -Host <pi-ip> -User <username> -Port 5000 -Platform linux/arm/v7`
+   - `.\deploy-docker-ssh.ps1 -Host <pi-ip> -User <username> -Port 5000 -Platform linux/arm/v7`
 5. Open the sender UI at `http://<pi-ip>:8080` (host networking). The receiver listens on port 5000.
 6. If `/sys/class/udc` is empty after boot, `dwc_otg` still owns the controller; verify the cmdline and reboot.
 
@@ -69,18 +70,22 @@ Why 32-bit? The Docker images in this repo are built for `linux/arm/v7`, which m
 1. Start the receiver on the Pi (with the HID gadget active).
 2. Launch the sender web UI with `dotnet run --project SenderApp -- 192.168.50.10 5000` and open the logged URL (defaults to `http://localhost:8080`), or send a single payload with `dotnet run --project SenderApp -- 192.168.50.10 5000 "Hello world!"`.
 3. When using the web UI, paste your text, press **Send**, and the text will be replayed as keystrokes on the USB-connected host.
-4. The sender UI shows the Raspberry Pi USB status; **connected (configured)** means the Pi is plugged into the host.
+4. The sender UI shows the Raspberry Pi USB status (dot in the top right); **connected (configured)** means the Pi is plugged into the host. The status updates via WebSocket push; use **Refresh** if you need a manual re-sync.
 5. The sender UI lets you pick the keyboard layout (en/de). When `SENDER_LAYOUT_TOKEN=true`, it sends a `{LAYOUT=..}` token before your text so the receiver can map correctly.
+6. On smaller screens the sender UI switches to a mobile layout and hides the desktop-only function keys.
 
 ### Special keys
 
 You can embed special key tokens in the text you send. Tokens are case-insensitive and wrapped in braces:
 
 - `{BACKSPACE}`, `{ENTER}`, `{TAB}`, `{ESC}`
-- `{DEL}`, `{UP}`, `{DOWN}`, `{LEFT}`, `{RIGHT}`, `{HOME}`, `{END}`, `{PAGEUP}`, `{PAGEDOWN}`
+- `{DEL}`, `{DELETE}`, `{UP}`, `{DOWN}`, `{LEFT}`, `{RIGHT}`, `{HOME}`, `{END}`, `{PAGEUP}`, `{PAGEDOWN}`
+- `{F1}` ... `{F12}`, `{PRINT}`, `{SCROLLLOCK}`, `{PAUSE}`, `{INSERT}`
 - `{WIN}`, `{CTRL}`, `{ALT}`, `{SHIFT}` (modifier-only keys)
 
 Use `{{` and `}}` to send literal `{` or `}` characters.
+
+Aliases: `{BKSP}`, `{PRTSC}`, `{PRINTSCREEN}`, `{SCRLK}`, `{BREAK}`, `{INS}`.
 
 Note: `{LAYOUT=..}` tokens are only understood by the .NET receiver. If you use the Python receiver under `pi-zero/`, disable layout prefixing with `SENDER_LAYOUT_TOKEN=false`.
 
@@ -94,7 +99,7 @@ For key chords, use `+` inside a token, for example:
 The receiver can target different host keyboard layouts:
 
 - `--layout=en` (default, US QWERTY)
-- `--layout=de` (German QWERTZ, includes `äöüß`)
+- `--layout=de` (German QWERTZ)
 
 You can also set `RECEIVER_LAYOUT=en|de` as an environment variable.
 
@@ -104,6 +109,12 @@ Run the receiver test suite:
 
 ```bash
 dotnet test ReceiverApp.Tests/ReceiverApp.Tests.fsproj
+```
+
+Run the sender test suite:
+
+```bash
+dotnet test SenderApp.Tests/SenderApp.Tests.fsproj
 ```
 
 Collect coverage at the same time with:

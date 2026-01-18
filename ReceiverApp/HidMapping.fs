@@ -171,6 +171,28 @@ module HidMapping =
             "TAB", { Modifier = 0uy; Key = 0x2Buy }
             "ESC", { Modifier = 0uy; Key = 0x29uy }
             "ESCAPE", { Modifier = 0uy; Key = 0x29uy }
+            "F1", { Modifier = 0uy; Key = 0x3Auy }
+            "F2", { Modifier = 0uy; Key = 0x3Buy }
+            "F3", { Modifier = 0uy; Key = 0x3Cuy }
+            "F4", { Modifier = 0uy; Key = 0x3Duy }
+            "F5", { Modifier = 0uy; Key = 0x3Euy }
+            "F6", { Modifier = 0uy; Key = 0x3Fuy }
+            "F7", { Modifier = 0uy; Key = 0x40uy }
+            "F8", { Modifier = 0uy; Key = 0x41uy }
+            "F9", { Modifier = 0uy; Key = 0x42uy }
+            "F10", { Modifier = 0uy; Key = 0x43uy }
+            "F11", { Modifier = 0uy; Key = 0x44uy }
+            "F12", { Modifier = 0uy; Key = 0x45uy }
+            "PRINT", { Modifier = 0uy; Key = 0x46uy }
+            "PRTSC", { Modifier = 0uy; Key = 0x46uy }
+            "PRINTSCREEN", { Modifier = 0uy; Key = 0x46uy }
+            "SCROLLLOCK", { Modifier = 0uy; Key = 0x47uy }
+            "SCROLL", { Modifier = 0uy; Key = 0x47uy }
+            "SCRLK", { Modifier = 0uy; Key = 0x47uy }
+            "PAUSE", { Modifier = 0uy; Key = 0x48uy }
+            "BREAK", { Modifier = 0uy; Key = 0x48uy }
+            "INSERT", { Modifier = 0uy; Key = 0x49uy }
+            "INS", { Modifier = 0uy; Key = 0x49uy }
             "DEL", { Modifier = 0uy; Key = 0x4Cuy }
             "DELETE", { Modifier = 0uy; Key = 0x4Cuy }
             "UP", { Modifier = 0uy; Key = 0x52uy }

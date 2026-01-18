@@ -16,6 +16,7 @@ type Options =
       Layout: HidMapping.KeyboardLayout }
 
 let defaultHidPath = "/dev/hidg0"
+let readTimeoutMs = 30000
 
 let parseOptions (argv: string[]) =
     let mutable port = 5000
@@ -133,8 +134,11 @@ let main argv =
         try
             printfn "Waiting for client..."
             use client = listener.AcceptTcpClient()
+            client.ReceiveTimeout <- readTimeoutMs
+            client.SendTimeout <- readTimeoutMs
             printfn "Client connected."
             use stream = client.GetStream()
+            stream.ReadTimeout <- readTimeoutMs
             use reader = new StreamReader(stream, Encoding.UTF8, false)
             let text = reader.ReadToEnd()
             printfn "Received %d characters" text.Length

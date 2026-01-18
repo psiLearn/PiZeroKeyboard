@@ -64,6 +64,22 @@ let ``processText handles special tokens`` () =
     Assert.Empty(unsupported)
 
 [<Fact>]
+let ``processText handles function and navigation tokens`` () =
+    let sent = ResizeArray<HidKey>()
+    let unsupported = ResizeArray<char>()
+
+    TextProcessor.processText sent.Add unsupported.Add defaultLayout "{F1}{PRINT}{PAGEUP}{INSERT}{SCROLLLOCK}{PAUSE}"
+
+    Assert.Equal<int>(6, sent.Count)
+    Assert.Equal(0x3Auy, sent.[0].Key)
+    Assert.Equal(0x46uy, sent.[1].Key)
+    Assert.Equal(0x4Buy, sent.[2].Key)
+    Assert.Equal(0x49uy, sent.[3].Key)
+    Assert.Equal(0x47uy, sent.[4].Key)
+    Assert.Equal(0x48uy, sent.[5].Key)
+    Assert.Empty(unsupported)
+
+[<Fact>]
 let ``processText escapes braces`` () =
     let sent = ResizeArray<HidKey>()
     let unsupported = ResizeArray<char>()
