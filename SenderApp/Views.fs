@@ -50,84 +50,96 @@ module Views =
                   option (layoutOptionAttrs selectedLayout "de") [ str "Deutsch (DE)" ]
               ] ]
 
+    type private KeySpec =
+        { Label: string
+          Token: string
+          ExtraClass: string }
+
+    let private specialKeyButton (spec: KeySpec) =
+        let className =
+            if String.IsNullOrWhiteSpace spec.ExtraClass then
+                "secondary key"
+            else
+                sprintf "secondary key %s" spec.ExtraClass
+
+        button
+            [ _type "button"
+              _class className
+              attr "data-token" spec.Token ]
+            [ str spec.Label ]
+
+    let private renderKeyRow rowClass specs =
+        div [ _class rowClass ] (specs |> List.map specialKeyButton)
+
+    let private renderDesktopKeys () =
+        let functionKeys =
+            [ "F1"; "F2"; "F3"; "F4"; "F5"; "F6"; "F7"; "F8"; "F9"; "F10"; "F11"; "F12" ]
+            |> List.map (fun label -> { Label = label; Token = sprintf "{%s}" label; ExtraClass = "" })
+
+        let utilityKeys =
+            [ { Label = "Print"; Token = "{PRINT}"; ExtraClass = "" }
+              { Label = "Scroll"; Token = "{SCROLLLOCK}"; ExtraClass = "" }
+              { Label = "Pause"; Token = "{PAUSE}"; ExtraClass = "" } ]
+
+        let navKeys =
+            [ { Label = "Ins"; Token = "{INSERT}"; ExtraClass = "" }
+              { Label = "Home"; Token = "{HOME}"; ExtraClass = "" }
+              { Label = "End"; Token = "{END}"; ExtraClass = "" }
+              { Label = "PgUp"; Token = "{PAGEUP}"; ExtraClass = "" }
+              { Label = "PgDn"; Token = "{PAGEDOWN}"; ExtraClass = "" } ]
+
+        div [ _class "desktop-only" ] [
+            renderKeyRow "key-row function-row" functionKeys
+            renderKeyRow "key-row utility-row" utilityKeys
+            renderKeyRow "key-row nav-row" navKeys
+        ]
+
+    let private renderKeyboardBlock () =
+        let row1 =
+            [ { Label = "Esc"; Token = "{ESC}"; ExtraClass = "" }
+              { Label = "Tab"; Token = "{TAB}"; ExtraClass = "wide-2" }
+              { Label = "Enter"; Token = "{ENTER}"; ExtraClass = "wide-2" }
+              { Label = "Backspace"; Token = "{BACKSPACE}"; ExtraClass = "wide-3" }
+              { Label = "Delete"; Token = "{DELETE}"; ExtraClass = "wide-2" } ]
+
+        let row2 =
+            [ { Label = "Ctrl"; Token = "{CTRL}"; ExtraClass = "wide-2" }
+              { Label = "Win"; Token = "{WIN}"; ExtraClass = "wide-2" }
+              { Label = "Alt"; Token = "{ALT}"; ExtraClass = "wide-2" }
+              { Label = "Space"; Token = " "; ExtraClass = "wide-4" }
+              { Label = "Shift"; Token = "{SHIFT}"; ExtraClass = "wide-2" } ]
+
+        div [ _class "keyboard-block" ] [
+            renderKeyRow "key-row keyboard-row" row1
+            renderKeyRow "key-row keyboard-row" row2
+        ]
+
+    let private renderShortcutRow () =
+        let shortcuts =
+            [ "Ctrl+A"; "Ctrl+C"; "Ctrl+V"; "Ctrl+X"; "Ctrl+Z" ]
+            |> List.map (fun label -> { Label = label; Token = sprintf "{%s}" label; ExtraClass = "" })
+        renderKeyRow "key-row shortcut-row" shortcuts
+
+    let private renderArrowBlock () =
+        let upKey = [ { Label = "Up"; Token = "{UP}"; ExtraClass = "" } ]
+        let downKeys =
+            [ { Label = "Left"; Token = "{LEFT}"; ExtraClass = "" }
+              { Label = "Down"; Token = "{DOWN}"; ExtraClass = "" }
+              { Label = "Right"; Token = "{RIGHT}"; ExtraClass = "" } ]
+
+        div [ _class "key-row arrow-block" ] [
+            div [ _class "arrow-pad" ] [
+                renderKeyRow "arrow-row" upKey
+                renderKeyRow "arrow-row" downKeys
+            ]
+        ]
+
     let renderSpecialKeys () =
-        let specialKeyButton label token extraClass =
-            let className =
-                if String.IsNullOrWhiteSpace extraClass then
-                    "secondary key"
-                else
-                    sprintf "secondary key %s" extraClass
-
-            button
-                [ _type "button"
-                  _class className
-                  attr "data-token" token ]
-                [ str label ]
-
         div [ _class "special-keys" ] [
-            div [ _class "desktop-only" ] [
-                div [ _class "key-row function-row" ] [
-                    specialKeyButton "F1" "{F1}" ""
-                    specialKeyButton "F2" "{F2}" ""
-                    specialKeyButton "F3" "{F3}" ""
-                    specialKeyButton "F4" "{F4}" ""
-                    specialKeyButton "F5" "{F5}" ""
-                    specialKeyButton "F6" "{F6}" ""
-                    specialKeyButton "F7" "{F7}" ""
-                    specialKeyButton "F8" "{F8}" ""
-                    specialKeyButton "F9" "{F9}" ""
-                    specialKeyButton "F10" "{F10}" ""
-                    specialKeyButton "F11" "{F11}" ""
-                    specialKeyButton "F12" "{F12}" ""
-                ]
-                div [ _class "key-row utility-row" ] [
-                    specialKeyButton "Print" "{PRINT}" ""
-                    specialKeyButton "Scroll" "{SCROLLLOCK}" ""
-                    specialKeyButton "Pause" "{PAUSE}" ""
-                ]
-                div [ _class "key-row nav-row" ] [
-                    specialKeyButton "Ins" "{INSERT}" ""
-                    specialKeyButton "Home" "{HOME}" ""
-                    specialKeyButton "End" "{END}" ""
-                    specialKeyButton "PgUp" "{PAGEUP}" ""
-                    specialKeyButton "PgDn" "{PAGEDOWN}" ""
-                ]
-            ]
-            div [ _class "keyboard-block" ] [
-                div [ _class "key-row keyboard-row" ] [
-                    specialKeyButton "Esc" "{ESC}" ""
-                    specialKeyButton "Tab" "{TAB}" "wide-2"
-                    specialKeyButton "Enter" "{ENTER}" "wide-2"
-                    specialKeyButton "Backspace" "{BACKSPACE}" "wide-3"
-                    specialKeyButton "Delete" "{DELETE}" "wide-2"
-                ]
-                div [ _class "key-row keyboard-row" ] [
-                    specialKeyButton "Ctrl" "{CTRL}" "wide-2"
-                    specialKeyButton "Win" "{WIN}" "wide-2"
-                    specialKeyButton "Alt" "{ALT}" "wide-2"
-                    specialKeyButton "Space" " " "wide-4"
-                    specialKeyButton "Shift" "{SHIFT}" "wide-2"
-                ]
-            ]
-            div [ _class "key-row shortcut-row" ] [
-                specialKeyButton "Ctrl+A" "{CTRL+A}" ""
-                specialKeyButton "Ctrl+C" "{CTRL+C}" ""
-                specialKeyButton "Ctrl+V" "{CTRL+V}" ""
-                specialKeyButton "Ctrl+X" "{CTRL+X}" ""
-                specialKeyButton "Ctrl+Z" "{CTRL+Z}" ""
-            ]
-            div [ _class "key-row arrow-block" ] [
-                div [ _class "arrow-pad" ] [
-                    div [ _class "arrow-row" ] [
-                        specialKeyButton "Up" "{UP}" ""
-                    ]
-                    div [ _class "arrow-row" ] [
-                        specialKeyButton "Left" "{LEFT}" ""
-                        specialKeyButton "Down" "{DOWN}" ""
-                        specialKeyButton "Right" "{RIGHT}" ""
-                    ]
-                ]
-            ]
+            renderDesktopKeys ()
+            renderKeyboardBlock ()
+            renderShortcutRow ()
+            renderArrowBlock ()
         ]
 
     let renderHint () =
