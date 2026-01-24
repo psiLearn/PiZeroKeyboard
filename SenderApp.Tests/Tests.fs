@@ -3,10 +3,18 @@ namespace SenderApp.Tests
 open System
 open System.IO
 open System.Net
+open System.Net.Http
 open System.Net.Sockets
+open System.Net.WebSockets
 open System.Text
 open System.Text.Json
+open System.Threading
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.TestHost
+open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging.Abstractions
 open Giraffe
 open SenderApp
@@ -20,6 +28,7 @@ open SenderApp.UsbStatusService
 open SenderApp.UsbStatusWatchers
 open SenderApp.CapsLockModel
 open SenderApp.UsbStatusModel
+open SenderApp.Routes
 open SenderApp.Views
 open Xunit
 
@@ -45,6 +54,54 @@ module Tests =
             action path
         finally
             File.Delete(path)
+
+    let withEnvTask name (value: string option) action =
+        task {
+            let prior = Environment.GetEnvironmentVariable name
+            match value with
+            | Some v -> Environment.SetEnvironmentVariable(name, v)
+            | None -> Environment.SetEnvironmentVariable(name, null)
+            try
+                return! action ()
+            finally
+                Environment.SetEnvironmentVariable(name, prior)
+        }
+
+    let withTempFileTask (content: string) action =
+        task {
+            let path = Path.GetTempFileName()
+            File.WriteAllText(path, content)
+            try
+                return! action path
+            finally
+                File.Delete(path)
+        }
+
+    let createServer settings =
+        let builder =
+            WebHostBuilder()
+                .ConfigureServices(fun services ->
+                    services.AddGiraffe() |> ignore)
+                .Configure(fun app ->
+                    app.UseWebSockets() |> ignore
+                    app.UseGiraffe(webApp settings))
+        new TestServer(builder)
+
+    let receiveWebSocketText (socket: WebSocket) (cancellationToken: CancellationToken) =
+        task {
+            let buffer = Array.zeroCreate<byte> 1024
+            let segment = ArraySegment<byte>(buffer)
+            let builder = StringBuilder()
+            let mutable finished = false
+            while not finished do
+                let! result = socket.ReceiveAsync(segment, cancellationToken)
+                if result.MessageType = WebSocketMessageType.Close then
+                    finished <- true
+                else
+                    builder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count)) |> ignore
+                    finished <- result.EndOfMessage
+            return builder.ToString()
+        }
 
     [<Fact>]
     let ``statusFromState maps configured`` () =
@@ -397,6 +454,62 @@ module Tests =
         let withoutTarget = renderHeader settings model false
         Assert.Equal(3, withTarget.Length)
         Assert.Equal(2, withoutTarget.Length)
+
+    [<Fact>]
+    let ``status websocket sends initial payload`` () =
+        task {
+            let settings: SenderSettings = { TargetIp = "127.0.0.1"; TargetPort = 5000 }
+            let! (payload: string) =
+                withTempFileTask "configured" (fun usbPath ->
+                    withTempFileTask "on" (fun capsPath ->
+                        withEnvTask "SENDER_USB_STATE_PATH" (Some usbPath) (fun () ->
+                            withEnvTask "SENDER_CAPSLOCK_PATH" (Some capsPath) (fun () ->
+                                task {
+                                    use server = createServer settings
+                                    let client: WebSocketClient = server.CreateWebSocketClient()
+                                    let uri = Uri("ws://localhost/status/ws")
+                                    use cts = new CancellationTokenSource(5000)
+                                    let! (socket: WebSocket) = client.ConnectAsync(uri, cts.Token)
+                                    use socket = socket
+                                    let! message = receiveWebSocketText socket cts.Token
+                                    do!
+                                        socket.CloseAsync(
+                                            WebSocketCloseStatus.NormalClosure,
+                                            "done",
+                                            CancellationToken.None
+                                        )
+                                    return message
+                                }))))
+
+            use doc = JsonDocument.Parse(payload)
+            let root = doc.RootElement
+            Assert.Equal("Raspberry Pi USB: connected (configured)", root.GetProperty("text").GetString())
+            Assert.Equal("Caps Lock: on", root.GetProperty("capsText").GetString())
+        }
+
+    [<Fact>]
+    let ``status websocket rejects non websocket requests`` () =
+        task {
+            let settings: SenderSettings = { TargetIp = "127.0.0.1"; TargetPort = 5000 }
+            use server = createServer settings
+            use client = server.CreateClient()
+            let! response = client.GetAsync("/status/ws")
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode)
+            let! body = response.Content.ReadAsStringAsync()
+            Assert.Contains("WebSocket endpoint", body)
+        }
+
+    [<Fact>]
+    let ``healthz returns ok`` () =
+        task {
+            let settings: SenderSettings = { TargetIp = "127.0.0.1"; TargetPort = 5000 }
+            use server = createServer settings
+            use client = server.CreateClient()
+            let! response = client.GetAsync("/healthz")
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+            let! body = response.Content.ReadAsStringAsync()
+            Assert.Equal("OK", body)
+        }
 
     [<Fact>]
     let ``sendOnceCli rejects invalid port`` () =
