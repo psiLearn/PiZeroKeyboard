@@ -68,6 +68,7 @@ module Startup =
                             webHostBuilder.UseUrls(httpUrls |> List.toArray)
 
                     configuredBuilder.Configure(fun app ->
+                        app.UseWebSockets() |> ignore
                         app.UseStaticFiles() |> ignore
                         app.UseGiraffe(webApp settings))
                     |> ignore)

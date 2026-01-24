@@ -3,6 +3,7 @@ namespace SenderApp
 module UsbStatusPayload =
     open System.Text.Json
     open Giraffe
+    open Microsoft.AspNetCore.Http
     open SenderApp.CapsLockService
     open SenderApp.UsbStatusService
 
@@ -29,6 +30,7 @@ module UsbStatusPayload =
         fun next ctx ->
             task {
                 let payload = buildStatusPayload ()
-                ctx.SetHttpHeader("Content-Type", "application/json; charset=utf-8")
-                return! text payload next ctx
+                ctx.Response.ContentType <- "application/json; charset=utf-8"
+                do! ctx.Response.WriteAsync(payload)
+                return Some ctx
             }
