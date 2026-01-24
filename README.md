@@ -5,7 +5,7 @@ Windows sender and Raspberry Pi Zero receiver written in F# for transmitting tex
 ## Projects
 
 - `SenderApp` - Windows console + web UI sender. Run `dotnet run -- <pi-ip> <port> "text"` for a one-off send, or `dotnet run -- <pi-ip> <port>` for the UI.
-- `SenderApp.Tests` - Sender unit tests (USB status mapping).
+- `SenderApp.Tests` - Sender unit/integration tests (configuration, handlers, views, WebSocket status, receiver client).
 - `ReceiverApp` – Raspberry Pi console app that listens for TCP connections, converts characters to HID codes, and writes them to `/dev/hidg0`.
 - `PiSetup/setup-hid-gadget.sh` – Helper script that configures the Pi Zero USB gadget as a keyboard (run once per boot as root).
 
@@ -140,9 +140,9 @@ Collect coverage at the same time with:
 dotnet test --settings coverage.runsettings --collect:"XPlat Code Coverage"
 ```
 
-Coverage reports (Cobertura, lcov, OpenCover) are written underneath `ReceiverApp.Tests/TestResults/<run-id>/`. The latest run produced about **62 % line** and **47 % branch** coverage, with gaps concentrated in `ReceiverApp/Program.fs`. Use tools such as [`reportgenerator`](https://github.com/danielpalme/ReportGenerator) to turn the XML output into HTML summaries, for example:
+Coverage reports (Cobertura, lcov, OpenCover) are written underneath each test project's `TestResults/<run-id>/` folder (for example `SenderApp.Tests/TestResults/<run-id>/`). The latest sender run produced about **56.44% line** and **48.49% branch** coverage. Use tools such as [`reportgenerator`](https://github.com/danielpalme/ReportGenerator) to turn the XML output into HTML summaries, for example:
 
 ```bash
 dotnet tool install --global dotnet-reportgenerator-globaltool
-reportgenerator "-reports:ReceiverApp.Tests/TestResults/*/coverage.opencover.xml" "-targetdir:coverage-report"
+reportgenerator "-reports:SenderApp.Tests/TestResults/*/coverage.opencover.xml" "-targetdir:coverage-report"
 ```
