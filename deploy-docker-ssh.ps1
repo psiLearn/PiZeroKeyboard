@@ -14,6 +14,10 @@ param(
     [string]$SenderImage = "linuxkey-sender:local",
     # Build platform
     [string]$Platform = "linux/arm/v7",
+    # HTTPS settings for the sender UI (optional)
+    [string]$HttpsCertPath = "",
+    [string]$HttpsCertPassword = "",
+    [int]$HttpsPort = 8443,
     [int]$RetryCount = 3,
     [int]$RetryDelaySec = 5,
     [int]$SshTimeoutSec = 15,
@@ -87,6 +91,13 @@ function Invoke-SshWithRetry {
 
 $tarPath = Join-Path $PSScriptRoot "linuxkey-receiver.tar"
 $senderTar = Join-Path $PSScriptRoot "linuxkey-sender.tar"
+$httpsEnabled = -not [string]::IsNullOrWhiteSpace($HttpsCertPath)
+$remoteCertDir = "/etc/linuxkey/certs"
+$remoteCertPath = "$remoteCertDir/sender.pfx"
+$remoteCertTemp = "/tmp/linuxkey-sender.pfx"
+if ($httpsEnabled -and -not (Test-Path $HttpsCertPath)) {
+    throw "HTTPS certificate not found at '$HttpsCertPath'."
+}
 if (-not $SkipBuild) {
     foreach ($p in @($tarPath, $senderTar)) {
         if (Test-Path $p) { Remove-Item $p -Force }
@@ -120,6 +131,16 @@ if (-not $SkipBuild) {
 }
 
 $composeTemp = Join-Path ([System.IO.Path]::GetTempPath()) ("linuxkey-compose-" + [System.Guid]::NewGuid().ToString("N") + ".yml")
+$httpsEnvLines = ""
+$httpsVolumeLine = ""
+if ($httpsEnabled) {
+    $httpsEnvLines = "      - SENDER_HTTPS_CERT_PATH=$remoteCertPath`n"
+    if (-not [string]::IsNullOrWhiteSpace($HttpsCertPassword)) {
+        $httpsEnvLines += "      - SENDER_HTTPS_CERT_PASSWORD=$HttpsCertPassword`n"
+    }
+    $httpsEnvLines += "      - SENDER_HTTPS_PORT=$HttpsPort`n"
+    $httpsVolumeLine = "      - $remoteCertDir:$remoteCertDir:ro`n"
+}
 $composeContent = @"
 version: "3.9"
 services:
@@ -151,14 +172,17 @@ services:
       - SENDER_USB_STATE_PATH=/sys/class/udc/3f980000.usb/state
       - SENDER_CAPSLOCK_PATH=/run/linuxkey/capslock
       - SENDER_LAYOUT_TOKEN=true
-    volumes:
+$httpsEnvLines    volumes:
       - /run/linuxkey:/run/linuxkey:ro
-"@
+$httpsVolumeLine"@
 Set-Content -Path $composeTemp -Value $composeContent -Encoding ASCII
 
 Write-Host "Copying artifacts to $TargetHost..." -ForegroundColor Cyan
 if ($SkipUpload) {
     Write-Warning "Skipping uploads; expecting /tmp/linuxkey-*.tar, /tmp/docker-compose.yml, and /tmp/setup-hid-gadget.sh to exist on the target."
+    if ($httpsEnabled) {
+        Write-Warning "HTTPS enabled; ensure $remoteCertPath exists on the target."
+    }
 } else {
     if ($SkipBuild) {
         foreach ($p in @($tarPath, $senderTar)) {
@@ -169,9 +193,12 @@ if ($SkipUpload) {
     Invoke-ScpWithRetry -Source $senderTar -Destination "${sshTarget}:/tmp/linuxkey-sender.tar" -Purpose "sender image"
     Invoke-ScpWithRetry -Source (Join-Path $PSScriptRoot "PiSetup/setup-hid-gadget.sh") -Destination "${sshTarget}:/tmp/setup-hid-gadget.sh" -Purpose "HID setup script"
     Invoke-ScpWithRetry -Source $composeTemp -Destination "${sshTarget}:/tmp/docker-compose.yml" -Purpose "compose file"
+    if ($httpsEnabled) {
+        Invoke-ScpWithRetry -Source $HttpsCertPath -Destination "${sshTarget}:${remoteCertTemp}" -Purpose "HTTPS certificate"
+    }
 }
 
-$remote = @'
+$remoteTemplate = @'
 set -e
 arch=$(uname -m)
 if [ "$arch" = "armv6l" ]; then
@@ -201,6 +228,14 @@ fi
 sudo modprobe libcomposite || true
 if ! mountpoint -q /sys/kernel/config; then
   sudo mount -t configfs none /sys/kernel/config
+fi
+cert_temp="__CERT_TEMP__"
+cert_dir="__CERT_DIR__"
+cert_dest="__CERT_DEST__"
+if [ -f "$cert_temp" ]; then
+  sudo mkdir -p "$cert_dir"
+  sudo mv "$cert_temp" "$cert_dest"
+  sudo chmod 644 "$cert_dest"
 fi
 hid_path="/tmp/setup-hid-gadget.sh"
 if [ -f /tmp/setup-hid-gadget.sh ]; then
@@ -239,6 +274,8 @@ sudo docker rm -f linuxkey-receiver || true
 sudo docker rm -f linuxkey-sender || true
 sudo $compose_cmd -f /tmp/docker-compose.yml up -d --force-recreate
 '@
+
+$remote = $remoteTemplate.Replace("__CERT_TEMP__", $remoteCertTemp).Replace("__CERT_DIR__", $remoteCertDir).Replace("__CERT_DEST__", $remoteCertPath)
 
 Write-Host "Deploying via SSH..." -ForegroundColor Cyan
 Invoke-SshWithRetry -Command $remote -Purpose "deploy"

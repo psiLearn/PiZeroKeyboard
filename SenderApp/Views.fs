@@ -64,8 +64,8 @@ module Views =
                   attr "data-token" token ]
                 [ str label ]
 
-            div [ _class "special-keys" ] [
-                div [ _class "desktop-only" ] [
+        div [ _class "special-keys" ] [
+            div [ _class "desktop-only" ] [
                 div [ _class "key-row function-row" ] [
                     specialKeyButton "F1" "{F1}" ""
                     specialKeyButton "F2" "{F2}" ""

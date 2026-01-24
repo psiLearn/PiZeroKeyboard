@@ -7,7 +7,11 @@ param(
     [string]$ReceiverImage = "linuxkey-receiver:local",
     [string]$SenderImage = "linuxkey-sender:local",
     # Build platform (Pi Zero often needs arm/v7 images; adjust if required)
-    [string]$Platform = "linux/arm/v7"
+    [string]$Platform = "linux/arm/v7",
+    # HTTPS certificate for the sender UI (optional)
+    [string]$HttpsCertPath = "",
+    [string]$HttpsCertPassword = "",
+    [int]$HttpsPort = 8443
 )
 
 Set-StrictMode -Version Latest
@@ -25,6 +29,13 @@ if (-not (Test-Path $bootRoot)) {
 $configProbe = Join-Path $bootRoot "config.txt"
 if (-not (Test-Path $configProbe)) {
     Write-Warning "No config.txt found at $configProbe. Ensure -BootDrive points to the Pi boot partition."
+}
+
+$httpsEnabled = -not [string]::IsNullOrWhiteSpace($HttpsCertPath)
+$remoteCertDir = "/etc/linuxkey/certs"
+$remoteCertPath = "$remoteCertDir/sender.pfx"
+if ($httpsEnabled -and -not (Test-Path $HttpsCertPath)) {
+    throw "HTTPS certificate not found at '$HttpsCertPath'."
 }
 
 $tarPath = Join-Path $PSScriptRoot "linuxkey-receiver.tar"
@@ -60,6 +71,20 @@ Write-Host "Copying image tar and setup script to $targetDir" -ForegroundColor C
 Copy-Item -Path $tarPath -Destination (Join-Path $targetDir "linuxkey-receiver.tar") -Force
 Copy-Item -Path $senderTar -Destination (Join-Path $targetDir "linuxkey-sender.tar") -Force
 Copy-Item -Path (Join-Path $PSScriptRoot "PiSetup/setup-hid-gadget.sh") -Destination (Join-Path $targetDir "setup-hid-gadget.sh") -Force
+if ($httpsEnabled) {
+    Copy-Item -Path $HttpsCertPath -Destination (Join-Path $targetDir "sender.pfx") -Force
+}
+
+$httpsEnvLines = ""
+$httpsVolumeLine = ""
+if ($httpsEnabled) {
+    $httpsEnvLines = "      - SENDER_HTTPS_CERT_PATH=$remoteCertPath`n"
+    if (-not [string]::IsNullOrWhiteSpace($HttpsCertPassword)) {
+        $httpsEnvLines += "      - SENDER_HTTPS_CERT_PASSWORD=$HttpsCertPassword`n"
+    }
+    $httpsEnvLines += "      - SENDER_HTTPS_PORT=$HttpsPort`n"
+    $httpsVolumeLine = "      - $remoteCertDir:$remoteCertDir:ro`n"
+}
 
 $composeContent = @"
 version: "3.9"
@@ -91,9 +116,9 @@ services:
       - SENDER_WEB_PORT=8080
       - SENDER_CAPSLOCK_PATH=/run/linuxkey/capslock
       - SENDER_LAYOUT_TOKEN=true
-    volumes:
+$httpsEnvLines    volumes:
       - /run/linuxkey:/run/linuxkey:ro
-"@
+$httpsVolumeLine"@
 Set-Content -Path (Join-Path $targetDir "docker-compose.yml") -Value $composeContent -Encoding ASCII
 
 $installScript = @'
@@ -131,6 +156,12 @@ fi
 sudo modprobe libcomposite || true
 if ! mountpoint -q /sys/kernel/config; then
   sudo mount -t configfs none /sys/kernel/config
+fi
+
+if [ -f /boot/linuxkey/sender.pfx ]; then
+  sudo mkdir -p /etc/linuxkey/certs
+  sudo cp /boot/linuxkey/sender.pfx /etc/linuxkey/certs/sender.pfx
+  sudo chmod 644 /etc/linuxkey/certs/sender.pfx
 fi
 
 cat <<'EOF' | sudo tee /etc/systemd/system/linuxkey-hid-gadget.service >/dev/null
