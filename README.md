@@ -88,8 +88,9 @@ The sender UI can run with HTTPS if you provide a PFX certificate. When HTTPS is
 3. When using the web UI, paste your text, press **Send**, and the text will be replayed as keystrokes on the USB-connected host.
 4. The sender UI shows the Raspberry Pi USB status (dot in the top right); **connected (configured)** means the Pi is plugged into the host. The status updates via WebSocket push; use **Refresh** if you need a manual re-sync.
 5. The Caps Lock dot reflects the host LED state when available (receiver writes it to `/run/linuxkey/capslock`).
-6. The sender UI lets you pick the keyboard layout (en/de). When `SENDER_LAYOUT_TOKEN=true`, it sends a `{LAYOUT=..}` token before your text so the receiver can map correctly.
-7. On smaller screens the sender UI switches to a mobile layout and hides the desktop-only function keys.
+6. Use **Back**/**Forward** to navigate previously sent text (stored in the browser local history).
+7. The sender UI lets you pick the keyboard layout (en/de). When `SENDER_LAYOUT_TOKEN=true`, it sends a `{LAYOUT=..}` token before your text so the receiver can map correctly.
+8. On smaller screens the sender UI switches to a mobile layout and hides the desktop-only function keys.
 
 ### Special keys
 

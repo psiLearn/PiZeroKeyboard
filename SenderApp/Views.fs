@@ -11,6 +11,7 @@ module Views =
             meta [ _charset "utf-8" ]
             meta [ _name "viewport"; _content "width=device-width, initial-scale=1" ]
             link [ _rel "stylesheet"; _href "/sender.css" ]
+            script [ _src "/history.js"; attr "defer" "defer" ] []
             script [ _src "/sender.js"; attr "defer" "defer" ] []
         ]
 
@@ -158,12 +159,29 @@ module Views =
               code [] [ str "}}" ]
               str " for literal braces." ]
 
+    let renderHistoryControls () =
+        div [ _class "send-row" ] [
+            button [ _type "submit"; _class "primary send"; _id "send-text" ] [ str "Send" ]
+            button
+                [ _type "button"
+                  _id "history-back"
+                  _class "secondary history-btn"
+                  attr "aria-label" "Previous in history" ]
+                [ str "Back" ]
+            button
+                [ _type "button"
+                  _id "history-forward"
+                  _class "secondary history-btn"
+                  attr "aria-label" "Next in history" ]
+                [ str "Forward" ]
+        ]
+
     let renderForm (model: IndexViewModel) =
         [ renderLayoutRow model.Layout
           textarea
               [ _id "text"; _name "text"; _placeholder "Paste text here..." ]
               [ str model.Text ]
-          button [ _type "submit"; _class "primary send" ] [ str "Send" ]
+          renderHistoryControls ()
           renderSpecialKeys ()
           renderHint () ]
 

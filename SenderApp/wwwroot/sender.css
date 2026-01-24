@@ -65,10 +65,15 @@ button.secondary:hover { background: #334155; }
 .arrow-pad { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; }
 .arrow-row { display: flex; gap: 0.4rem; justify-content: center; }
 .send { margin-top: 0.1rem; }
+.send-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.send-row .send { flex: 1 1 12rem; }
+.history-btn { padding: 0.6rem 1rem; font-size: 0.9rem; }
 body.mobile { margin: 1rem auto; padding: 0 1rem; }
 body.mobile h1 { font-size: 1.6rem; }
 body.mobile textarea { min-height: 10rem; font-size: 1rem; }
 body.mobile button.primary { width: 100%; align-self: stretch; }
+body.mobile .send-row { flex-direction: column; align-items: stretch; }
+body.mobile .send-row .history-btn { width: 100%; }
 @media (max-width: 720px) {
   body { margin: 1rem auto; padding: 0 1rem; }
   h1 { font-size: 1.6rem; }
@@ -76,4 +81,6 @@ body.mobile button.primary { width: 100%; align-self: stretch; }
   button.primary { width: 100%; align-self: stretch; }
   .status-panel { top: 0.6rem; right: 0.6rem; }
   .desktop-only { display: none; }
+  .send-row { flex-direction: column; align-items: stretch; }
+  .send-row .history-btn { width: 100%; }
 }

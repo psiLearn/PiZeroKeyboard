@@ -58,6 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
   connectWebSocket();
 
   const textarea = document.getElementById('text');
+  const form = textarea ? textarea.closest('form') : null;
+  const historyBack = document.getElementById('history-back');
+  const historyForward = document.getElementById('history-forward');
+  const historyKey = 'linuxkey-history';
+  const historyIndexKey = 'linuxkey-history-index';
+  const historyApi = window.LinuxKeyHistory;
   const insertToken = (token) => {
     if (!textarea || !token) return;
     const start = textarea.selectionStart ?? textarea.value.length;
@@ -74,4 +80,80 @@ document.addEventListener('DOMContentLoaded', () => {
       insertToken(button.getAttribute('data-token'));
     });
   });
+
+  const updateHistoryButtons = (index, items) => {
+    if (historyBack) historyBack.disabled = index <= 0;
+    if (historyForward) historyForward.disabled = index >= items.length - 1;
+  };
+
+  const applyHistory = (index, items) => {
+    if (!textarea) return;
+    const value = items[index] ?? '';
+    textarea.value = value;
+    const caret = value.length;
+    textarea.setSelectionRange(caret, caret);
+    textarea.focus();
+  };
+
+  let historyItems = [];
+  let historyIndex = 0;
+
+  const loadHistoryState = () => {
+    if (!historyApi) return { items: [], index: 0 };
+    return historyApi.loadHistoryState(localStorage, historyKey, historyIndexKey);
+  };
+
+  const persistHistoryIndex = (index) => {
+    if (!historyApi) return;
+    historyApi.writeHistoryIndex(localStorage, historyIndexKey, index);
+  };
+
+  const addHistoryEntry = (text) => {
+    if (!historyApi) return { items: historyItems, index: historyIndex };
+    return historyApi.addHistoryEntry(localStorage, historyKey, historyIndexKey, text);
+  };
+
+  const refreshHistoryState = () => {
+    const state = loadHistoryState();
+    historyItems = state.items;
+    historyIndex = state.index;
+    updateHistoryButtons(historyIndex, historyItems);
+  };
+
+  if (historyBack || historyForward) {
+    refreshHistoryState();
+
+    if (historyBack) {
+      historyBack.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (historyIndex > 0) {
+          historyIndex -= 1;
+          persistHistoryIndex(historyIndex);
+          applyHistory(historyIndex, historyItems);
+          updateHistoryButtons(historyIndex, historyItems);
+        }
+      });
+    }
+
+    if (historyForward) {
+      historyForward.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (historyIndex < historyItems.length - 1) {
+          historyIndex += 1;
+          persistHistoryIndex(historyIndex);
+          applyHistory(historyIndex, historyItems);
+          updateHistoryButtons(historyIndex, historyItems);
+        }
+      });
+    }
+  }
+
+  if (form && textarea) {
+    form.addEventListener('submit', () => {
+      const state = addHistoryEntry(textarea.value);
+      historyItems = state.items;
+      historyIndex = state.index;
+      updateHistoryButtons(historyIndex, historyItems);
+    });
+  }
 });
