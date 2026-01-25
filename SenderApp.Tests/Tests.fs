@@ -512,6 +512,21 @@ module Tests =
         }
 
     [<Fact>]
+    let ``index page includes history controls and scripts`` () =
+        task {
+            let settings: SenderSettings = { TargetIp = "127.0.0.1"; TargetPort = 5000 }
+            use server = createServer settings
+            use client = server.CreateClient()
+            let! response = client.GetAsync("/")
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+            let! body = response.Content.ReadAsStringAsync()
+            Assert.Contains("id=\"history-back\"", body)
+            Assert.Contains("id=\"history-forward\"", body)
+            Assert.Contains("src=\"/history.js\"", body)
+            Assert.Contains("src=\"/sender.js\"", body)
+        }
+
+    [<Fact>]
     let ``sendOnceCli rejects invalid port`` () =
         let result = sendOnceCli "127.0.0.1" "nope" "hello"
         Assert.Equal(1, result)

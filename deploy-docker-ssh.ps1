@@ -39,6 +39,52 @@ if (-not (Get-Command scp -ErrorAction SilentlyContinue)) {
     throw "scp command not found. Install OpenSSH client."
 }
 
+$isWindowsHost =
+    ($PSVersionTable.PSEdition -eq "Desktop") -or
+    ($env:OS -eq "Windows_NT") -or
+    ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT)
+
+function Get-DockerOsType {
+    $osType = & docker info --format "{{.OSType}}" 2>$null
+    if ($LASTEXITCODE -ne 0) { return $null }
+    if ([string]::IsNullOrWhiteSpace($osType)) { return $null }
+    return $osType.Trim()
+}
+
+function Start-DockerDesktopIfAvailable {
+    if (-not $isWindowsHost) { return $false }
+    $candidates = @(
+        (Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Docker\Docker\Docker Desktop.exe")
+    ) | Where-Object { $_ -and (Test-Path $_) }
+    foreach ($path in $candidates) {
+        try {
+            Start-Process -FilePath $path | Out-Null
+            return $true
+        } catch {
+            # ignore and continue
+        }
+    }
+    return $false
+}
+
+function Ensure-DockerReady {
+    param(
+        [int]$Attempts = 6,
+        [int]$DelaySec = 5
+    )
+
+    for ($i = 1; $i -le $Attempts; $i++) {
+        $osType = Get-DockerOsType
+        if ($osType) { return $osType }
+        if ($i -eq 1) {
+            Start-DockerDesktopIfAvailable | Out-Null
+        }
+        Start-Sleep -Seconds $DelaySec
+    }
+    throw "Docker engine is not reachable. Start Docker Desktop and ensure Linux containers are enabled, then retry."
+}
+
 $sshTarget = "${User}@${TargetHost}"
 $sshOptions = @(
     "-o", "ServerAliveInterval=30",
@@ -99,6 +145,10 @@ if ($httpsEnabled -and -not (Test-Path $HttpsCertPath)) {
     throw "HTTPS certificate not found at '$HttpsCertPath'."
 }
 if (-not $SkipBuild) {
+    $dockerOs = Ensure-DockerReady
+    if ($dockerOs -ne "linux") {
+        throw "Docker engine is running in '$dockerOs' mode. Switch to Linux containers and retry."
+    }
     foreach ($p in @($tarPath, $senderTar)) {
         if (Test-Path $p) { Remove-Item $p -Force }
     }
@@ -139,10 +189,9 @@ if ($httpsEnabled) {
         $httpsEnvLines += "      - SENDER_HTTPS_CERT_PASSWORD=$HttpsCertPassword`n"
     }
     $httpsEnvLines += "      - SENDER_HTTPS_PORT=$HttpsPort`n"
-    $httpsVolumeLine = "      - $remoteCertDir:$remoteCertDir:ro`n"
+    $httpsVolumeLine = "      - ${remoteCertDir}:${remoteCertDir}:ro`n"
 }
 $composeContent = @"
-version: "3.9"
 services:
   receiver:
     image: $ReceiverImage
@@ -174,7 +223,8 @@ services:
       - SENDER_LAYOUT_TOKEN=true
 $httpsEnvLines    volumes:
       - /run/linuxkey:/run/linuxkey:ro
-$httpsVolumeLine"@
+$httpsVolumeLine
+"@
 Set-Content -Path $composeTemp -Value $composeContent -Encoding ASCII
 
 Write-Host "Copying artifacts to $TargetHost..." -ForegroundColor Cyan
@@ -270,9 +320,9 @@ sudo systemctl enable linuxkey-hid-gadget.service
 sudo bash "$hid_path"
 sudo docker load -i /tmp/linuxkey-receiver.tar
 sudo docker load -i /tmp/linuxkey-sender.tar
-sudo docker rm -f linuxkey-receiver || true
-sudo docker rm -f linuxkey-sender || true
-sudo $compose_cmd -f /tmp/docker-compose.yml up -d --force-recreate
+compose_project="linuxkey"
+sudo $compose_cmd -p "$compose_project" -f /tmp/docker-compose.yml down --remove-orphans || true
+sudo $compose_cmd -p "$compose_project" -f /tmp/docker-compose.yml up -d --force-recreate
 '@
 
 $remote = $remoteTemplate.Replace("__CERT_TEMP__", $remoteCertTemp).Replace("__CERT_DIR__", $remoteCertDir).Replace("__CERT_DEST__", $remoteCertPath)

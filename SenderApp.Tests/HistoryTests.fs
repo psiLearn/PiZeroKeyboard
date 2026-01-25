@@ -1,9 +1,12 @@
 namespace SenderApp.Tests
 
+open System
 open System.Collections.Generic
 open System.IO
 open Jint
 open Jint.Native
+open Jint.Runtime
+open Jint.Runtime.Interop
 open Xunit
 
 type FakeStorage() =
@@ -25,6 +28,66 @@ module HistoryTests =
     let historyKey = "linuxkey-history"
     let historyIndexKey = "linuxkey-history-index"
 
+    type EventStub() =
+        member _.preventDefault() = ()
+
+    type WebSocketStub(url: string) =
+        member val onmessage: obj = null with get, set
+        member val onerror: obj = null with get, set
+        member val onclose: obj = null with get, set
+        member _.close() = ()
+
+    type LocationStub() =
+        member val protocol = "http:" with get, set
+        member val host = "localhost" with get, set
+
+    type WindowStub(engine: Engine) =
+        let ctor = TypeReference.CreateTypeReference(engine, typeof<WebSocketStub>)
+        member val location = LocationStub() with get, set
+        member val WebSocket = ctor with get, set
+        member _.setTimeout(_: obj, _: obj) = 0
+
+    type DomElement(engine: Engine, id: string, ?closestTarget: obj) =
+        let handlers = Dictionary<string, JsValue>()
+        member val id = id with get, set
+        member val value = "" with get, set
+        member val disabled = false with get, set
+        member val className = "" with get, set
+        member val selectionStart = 0 with get, set
+        member val selectionEnd = 0 with get, set
+        member _.setAttribute(_: string, _: obj) = ()
+        member _.getAttribute(_: string) = null
+        member _.setSelectionRange(_: int, _: int) = ()
+        member _.focus() = ()
+        member _.addEventListener(name: string, callback: JsValue) =
+            handlers.[name] <- callback
+        member _.click() =
+            match handlers.TryGetValue("click") with
+            | true, callback ->
+                engine.Invoke(callback, JsValue.Undefined, [| EventStub() |]) |> ignore
+            | _ -> ()
+        member _.closest(selector: string) =
+            if selector = "form" then
+                defaultArg closestTarget null
+            else
+                null
+
+    type DocumentStub(engine: Engine, elements: IDictionary<string, DomElement>) =
+        let mutable domReady: JsValue option = None
+        member _.addEventListener(name: string, callback: JsValue) =
+            if name = "DOMContentLoaded" then
+                domReady <- Some callback
+        member _.getElementById(id: string) =
+            match elements.TryGetValue id with
+            | true, element -> element
+            | _ -> null
+        member _.querySelectorAll(_: string) =
+            engine.Realm.Intrinsics.Array.Construct(Arguments.Empty)
+        member _.TriggerDOMContentLoaded() =
+            match domReady with
+            | Some callback -> engine.Invoke(callback, JsValue.Undefined, [||]) |> ignore
+            | None -> ()
+
     let loadHistoryEngine (storage: FakeStorage) =
         let engine = new Engine()
         let scriptPath =
@@ -33,6 +96,32 @@ module HistoryTests =
         engine.Execute(script) |> ignore
         engine.SetValue("localStorage", storage) |> ignore
         engine
+
+    let loadSenderDomEngine (storage: FakeStorage) =
+        let engine = new Engine()
+        engine.SetValue("localStorage", storage) |> ignore
+        let elements = Dictionary<string, DomElement>()
+        let form = DomElement(engine, "form")
+        let textarea = DomElement(engine, "text", form)
+        let back = DomElement(engine, "history-back")
+        let forward = DomElement(engine, "history-forward")
+        elements.["form"] <- form
+        elements.["text"] <- textarea
+        elements.["history-back"] <- back
+        elements.["history-forward"] <- forward
+
+        let document = DocumentStub(engine, elements)
+        let window = WindowStub(engine)
+        engine.SetValue("document", document) |> ignore
+        engine.SetValue("window", window) |> ignore
+        engine.SetValue("WebSocket", window.WebSocket) |> ignore
+        let historyPath =
+            Path.Combine(__SOURCE_DIRECTORY__, "..", "SenderApp", "wwwroot", "history.js")
+        let senderPath =
+            Path.Combine(__SOURCE_DIRECTORY__, "..", "SenderApp", "wwwroot", "sender.js")
+        engine.Execute(File.ReadAllText(historyPath)) |> ignore
+        engine.Execute(File.ReadAllText(senderPath)) |> ignore
+        engine, document
 
     let invokeHistory (engine: Engine) name (args: obj array) =
         let history = engine.GetValue("LinuxKeyHistory").AsObject()
@@ -143,3 +232,17 @@ module HistoryTests =
 
         Assert.Equal<string list>([ "hello"; "second" ], items3)
         Assert.Equal(1, index3)
+
+    [<Fact>]
+    let ``history back button restores previous text`` () =
+        let storage = FakeStorage()
+        storage.SetRaw(historyKey, "[\"first\",\"second\"]")
+        storage.SetRaw(historyIndexKey, "1")
+        let (engine, document) = loadSenderDomEngine storage
+
+        document.TriggerDOMContentLoaded()
+        engine.Execute("elements['history-back'].click();") |> ignore
+
+        let value = engine.Evaluate("elements['text'].value").ToString()
+        Assert.Equal("first", value)
+        Assert.Equal("0", storage.getItem(historyIndexKey))
