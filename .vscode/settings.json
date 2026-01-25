@@ -10,6 +10,9 @@
         "npm install": true,
         "npm run build": true,
         "dotnet tool": true,
-        "fable": true
+        "fable": true,
+        "Select": true,
+        "git add": true,
+        "git commit": true
     }
 }
