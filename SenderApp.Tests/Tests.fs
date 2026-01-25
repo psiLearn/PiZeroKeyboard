@@ -23,6 +23,8 @@ open SenderApp.ReceiverClient
 open SenderApp.CapsLockService
 open SenderApp.Configuration
 open SenderApp.Handlers
+open SenderApp.SendingControlsService
+open SenderApp.ConnectionRetryService
 open SenderApp.UsbStatusPayload
 open SenderApp.UsbStatusService
 open SenderApp.UsbStatusWatchers
@@ -439,6 +441,7 @@ module Tests =
         Assert.Empty(buildStatusNodes false settings (Success 1))
         Assert.Equal(1, (buildStatusNodes true settings (Success 1)).Length)
         Assert.Equal(1, (buildStatusNodes true settings (Failure "oops")).Length)
+        Assert.Equal(1, (buildStatusNodes true settings (Sending { BytesSent = 50; TotalBytes = 100 })).Length)
 
     [<Fact>]
     let ``renderHeader includes target only when enabled`` () =
@@ -449,11 +452,15 @@ module Tests =
               UsbStatus = statusFromState "configured"
               CapsLock = statusFromValue "off"
               IsMobile = false
-              Layout = "en" }
+              Layout = "en"
+              ConnectionStatus = NotConnected { Reason = "Test"; LastAttempt = None; RetryCount = 0; Suggestion = "Test suggestion" }
+              KeyboardVisibility = Visible
+              SendingControls = SendingControlsService.defaultControls
+              RetryState = ConnectionRetryService.defaultRetryState }
         let withTarget = renderHeader settings model true
         let withoutTarget = renderHeader settings model false
-        Assert.Equal(3, withTarget.Length)
-        Assert.Equal(2, withoutTarget.Length)
+        Assert.Equal(4, withTarget.Length)
+        Assert.Equal(3, withoutTarget.Length)
 
     [<Fact>]
     let ``status websocket sends initial payload`` () =

@@ -23,12 +23,42 @@
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed)
-        ? parsed.filter((item) => typeof item === 'string')
-        : [];
+      if (!Array.isArray(parsed)) return [];
+      
+      // Support both old string format and new object format
+      return parsed.map((item) => {
+        if (typeof item === 'string') {
+          // Migrate old string format to new object format
+          return { text: item, timestamp: Date.now() };
+        }
+        if (item && typeof item === 'object' && item.text) {
+          // Already in new format
+          return { text: item.text, timestamp: item.timestamp || Date.now() };
+        }
+        return null;
+      }).filter(item => item !== null);
     } catch {
       return [];
     }
+  };
+
+  const formatHistoryPreview = (item) => {
+    if (typeof item === 'string') {
+      return item; // fallback for old format
+    }
+    const text = item.text || '';
+    const preview = text.length > 30 ? text.substring(0, 30) + '…' : text;
+    
+    let timeStr = '';
+    if (item.timestamp) {
+      const date = new Date(item.timestamp);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      timeStr = `${hours}:${minutes}:${seconds} | `;
+    }
+    
+    return timeStr + preview;
   };
 
   const readHistory = (storage, historyKey) => {
@@ -74,8 +104,11 @@
     }
 
     const items = readHistory(storage, historyKey);
-    if (items.length === 0 || items[items.length - 1] !== trimmed) {
-      items.push(trimmed);
+    const lastItem = items.length > 0 ? items[items.length - 1] : null;
+    const lastText = lastItem ? (lastItem.text || lastItem) : '';
+    
+    if (items.length === 0 || lastText !== trimmed) {
+      items.push({ text: trimmed, timestamp: Date.now() });
       writeHistory(storage, historyKey, items);
     }
 
@@ -94,5 +127,6 @@
     loadHistoryState,
     addHistoryEntry,
     clampIndex,
+    formatHistoryPreview,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

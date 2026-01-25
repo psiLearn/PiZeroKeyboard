@@ -2,10 +2,13 @@ namespace SenderApp
 
 module Startup =
     open System
+    open System.IO
     open Microsoft.AspNetCore.Builder
     open Microsoft.AspNetCore.Hosting
     open Microsoft.AspNetCore.Server.Kestrel.Https
+    open Microsoft.AspNetCore.StaticFiles
     open Microsoft.Extensions.DependencyInjection
+    open Microsoft.Extensions.FileProviders
     open Microsoft.Extensions.Hosting
     open Giraffe
     open SenderApp.Configuration
@@ -69,7 +72,12 @@ module Startup =
 
                     configuredBuilder.Configure(fun app ->
                         app.UseWebSockets() |> ignore
-                        app.UseStaticFiles() |> ignore
+                        let baseDir = AppDomain.CurrentDomain.BaseDirectory
+                        let wwwrootPath = Path.Combine(baseDir, "wwwroot")
+                        let fileProvider = new PhysicalFileProvider(wwwrootPath)
+                        let staticFileOptions = StaticFileOptions()
+                        staticFileOptions.FileProvider <- fileProvider
+                        app.UseStaticFiles(staticFileOptions) |> ignore
                         app.UseGiraffe(webApp settings))
                     |> ignore)
 

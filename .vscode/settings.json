@@ -1,5 +1,15 @@
 {
     "workbench.colorCustomizations": {
         "statusBar.background": "#36b75d"
+    },
+    "chat.tools.terminal.autoApprove": {
+        "dotnet build": true,
+        "dotnet test": true,
+        "dotnet restore": true,
+        "dir": true,
+        "npm install": true,
+        "npm run build": true,
+        "dotnet tool": true,
+        "fable": true
     }
 }

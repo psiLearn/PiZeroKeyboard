@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "outDir": "../wwwroot"
+  },
+  "include": ["src/**/*.fs"],
+  "exclude": []
+}

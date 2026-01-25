@@ -27,50 +27,56 @@ module TextProcessor =
             |> Array.map (fun part -> part.Trim())
             |> Array.filter (fun part -> part.Length > 0)
 
-        if parts.Length = 0 then
-            None
+        if parts.Length = 0 then None
         else
-            let mutable modifier = 0uy
-            let mutable keyOpt: HidKey option = None
-            let mutable invalid = false
-
-            let setKey (hid: HidKey) =
-                match keyOpt with
-                | Some _ -> invalid <- true
-                | None -> keyOpt <- Some hid
-
-            for part in parts do
+            let processChordPart layout (modifier, keyOpt, invalid) part =
                 match HidMapping.tryGetModifierToken part with
-                | Some modValue ->
-                    modifier <- modifier ||| modValue
+                | Some modValue -> (modifier ||| modValue, keyOpt, invalid)
                 | None ->
                     match HidMapping.tryGetSpecialToken part with
                     | Some hid when hid.Key <> 0uy ->
-                        setKey hid
+                        if Option.isSome keyOpt then (modifier, keyOpt, true)
+                        else (modifier, Some hid, invalid)
                     | Some hid ->
-                        modifier <- modifier ||| hid.Modifier
+                        (modifier ||| hid.Modifier, keyOpt, invalid)
                     | None ->
                         if part.Length = 1 then
                             let ch = part.[0]
-                            let normalized =
-                                if Char.IsLetter ch then
-                                    Char.ToLowerInvariant ch
-                                else
-                                    ch
-
+                            let normalized = if Char.IsLetter ch then Char.ToLowerInvariant ch else ch
                             match HidMapping.toHid layout normalized with
-                            | Some hid -> setKey hid
-                            | None -> invalid <- true
-                        else
-                            invalid <- true
+                            | Some hid ->
+                                if Option.isSome keyOpt then (modifier, keyOpt, true)
+                                else (modifier, Some hid, invalid)
+                            | None -> (modifier, keyOpt, true)
+                        else (modifier, keyOpt, true)
 
-            if invalid then
-                None
-            else
-                match keyOpt with
-                | Some hid -> Some { hid with Modifier = hid.Modifier ||| modifier }
-                | None when modifier <> 0uy -> Some { Modifier = modifier; Key = 0uy }
-                | None -> None
+            let (modifier, keyOpt, invalid) = 
+                Array.fold (processChordPart layout) (0uy, None, false) parts
+
+            match invalid, keyOpt, modifier with
+            | true, _, _ -> None
+            | false, Some hid, _ -> Some { hid with Modifier = hid.Modifier ||| modifier }
+            | false, None, m when m <> 0uy -> Some { Modifier = m; Key = 0uy }
+            | _ -> None
+
+    let private tryParseToken token =
+        match tryParseLayoutToken token with
+        | Some layout -> Some (LayoutSwitch layout)
+        | None ->
+            if token.Contains "+" then Some (ChordToken token)
+            else HidMapping.tryGetSpecialToken token |> Option.map SpecialKey
+
+    let private handleBracketToken (tokens: ResizeArray<ParsedToken>) token endIdx =
+        match tryParseToken token with
+        | Some parsedToken ->
+            tokens.Add(parsedToken)
+            endIdx + 1
+        | None ->
+            tokens.Add(TextChar '{')
+            for ch in token do
+                tokens.Add(TextChar ch)
+            tokens.Add(TextChar '}')
+            endIdx + 1
 
     let private tokenize (text: string) =
         let tokens = ResizeArray<ParsedToken>()
@@ -84,31 +90,13 @@ module TextProcessor =
                 tokens.Add(TextChar '}')
                 i <- i + 2
             | '{' ->
-                let endIdx = text.IndexOf('}', i + 1)
-                if endIdx = -1 then
+                match text.IndexOf('}', i + 1) with
+                | -1 ->
                     tokens.Add(TextChar '{')
                     i <- i + 1
-                else
+                | endIdx ->
                     let token = text.Substring(i + 1, endIdx - i - 1)
-                    let parsed =
-                        match tryParseLayoutToken token with
-                        | Some layout -> Some (LayoutSwitch layout)
-                        | None ->
-                            if token.Contains "+" then
-                                Some (ChordToken token)
-                            else
-                                HidMapping.tryGetSpecialToken token |> Option.map SpecialKey
-
-                    match parsed with
-                    | Some parsedToken ->
-                        tokens.Add(parsedToken)
-                        i <- endIdx + 1
-                    | None ->
-                        tokens.Add(TextChar '{')
-                        for ch in token do
-                            tokens.Add(TextChar ch)
-                        tokens.Add(TextChar '}')
-                        i <- endIdx + 1
+                    i <- handleBracketToken tokens token endIdx
             | ch ->
                 tokens.Add(TextChar ch)
                 i <- i + 1
