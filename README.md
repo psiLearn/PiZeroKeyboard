@@ -16,6 +16,21 @@ dotnet build SenderApp
 dotnet build ReceiverApp
 ```
 
+### Client build (Fable)
+
+The sender UI client can be rebuilt from `SenderApp/Client` (Fable + npm). `SenderApp.fsproj` runs `npm install`/`npm run build` before build (best-effort), but you can run it explicitly:
+
+```powershell
+.\build-client.ps1
+```
+
+If Node/npm are missing, the build will still succeed but the UI bundle may be stale.
+
+### Utility scripts
+
+- `build-client.ps1` – rebuilds the Fable client bundle.
+- `validate-history.ps1` – quick validation for `SenderApp/Client/src/History.fs` (checks for key types/functions).
+
 ## Deploy on Raspberry Pi
 
 1. Ensure OTG mode is enabled in `/boot/config.txt` and `/boot/cmdline.txt` by loading the `dwc2` driver.
@@ -64,6 +79,7 @@ Why 32-bit? The Docker images in this repo are built for `linux/arm/v7`, which m
 - Build and deploy over SSH: `.\deploy-docker-ssh.ps1 -Host 192.168.50.10 -User pi -Port 5000 -Platform linux/arm/v7`. This builds both images locally, copies them plus the compose file and HID setup script, then loads and runs the compose stack remotely (requires `ssh`/`scp` clients).
 - Compose stack runs on host networking; the sender UI is at `http://<pi-ip>:8080` and targets the receiver on `127.0.0.1:5000` by default. If HTTPS is enabled, it listens on `https://<pi-ip>:8443` and HTTP is disabled.
 - Note: .NET containers require armv7+; Pi Zero (armv6) cannot run these images. Use a Zero 2 / Pi 3+ or deploy directly without Docker on armv6 hardware.
+- Windows note: ensure Docker Desktop is running in **Linux containers** mode before running `deploy-docker-ssh.ps1`.
 
 ### HTTPS (Kestrel, optional)
 

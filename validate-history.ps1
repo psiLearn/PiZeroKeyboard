@@ -35,7 +35,7 @@ $functions = @(
 )
 
 foreach ($func in $functions) {
-    if ($content -contains "*$func*") {
+    if ($content -match "\b$([Regex]::Escape($func))\b") {
         Write-Host "✅ Function '$func' defined" -ForegroundColor Green
     } else {
         Write-Host "⚠️  Function '$func' not found" -ForegroundColor Yellow
@@ -49,7 +49,7 @@ $types = @(
 )
 
 foreach ($type in $types) {
-    if ($content -contains "*$type*") {
+    if ($content -match "\b$([Regex]::Escape($type))\b") {
         Write-Host "✅ Type '$type' defined" -ForegroundColor Green
     } else {
         Write-Host "⚠️  Type '$type' not found" -ForegroundColor Yellow
