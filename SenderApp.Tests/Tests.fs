@@ -437,11 +437,17 @@ module Tests =
     [<Fact>]
     let ``buildStatusNodes respects flags`` () =
         let settings: SenderSettings = { TargetIp = "127.0.0.1"; TargetPort = 5000 }
-        Assert.Empty(buildStatusNodes true settings Idle)
-        Assert.Empty(buildStatusNodes false settings (Success 1))
-        Assert.Equal(1, (buildStatusNodes true settings (Success 1)).Length)
-        Assert.Equal(1, (buildStatusNodes true settings (Failure "oops")).Length)
-        Assert.Equal(1, (buildStatusNodes true settings (Sending { BytesSent = 50; TotalBytes = 100 })).Length)
+        let nodes1 = buildStatusNodes true settings Idle
+        let nodes2 = buildStatusNodes false settings (Success 1)
+        let nodes3 = buildStatusNodes true settings (Success 1)
+        let nodes4 = buildStatusNodes true settings (Failure "oops")
+        let nodes5 = buildStatusNodes true settings (Sending { BytesSent = 50; TotalBytes = 100 }) None
+        
+        Assert.Empty(nodes1)
+        Assert.Empty(nodes2)
+        Assert.Equal(1, nodes3.Length)
+        Assert.Equal(1, nodes4.Length)
+        Assert.Equal(1, nodes5.Length)
 
     [<Fact>]
     let ``renderHeader includes target only when enabled`` () =
@@ -456,7 +462,9 @@ module Tests =
               ConnectionStatus = NotConnected { Reason = "Test"; LastAttempt = None; RetryCount = 0; Suggestion = "Test suggestion" }
               KeyboardVisibility = Visible
               SendingControls = SendingControlsService.defaultControls
-              RetryState = ConnectionRetryService.defaultRetryState }
+              RetryState = ConnectionRetryService.defaultRetryState
+              AutoRetryEnabled = false
+              SendStartTime = None }
         let withTarget = renderHeader settings model true
         let withoutTarget = renderHeader settings model false
         Assert.Equal(4, withTarget.Length)
