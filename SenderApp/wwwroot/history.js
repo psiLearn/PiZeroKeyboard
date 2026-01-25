@@ -19,6 +19,8 @@
     }
   };
 
+  const MAX_HISTORY_ITEMS = 50;
+
   const parseItems = (raw) => {
     if (!raw) return [];
     try {
@@ -109,6 +111,9 @@
     
     if (items.length === 0 || lastText !== trimmed) {
       items.push({ text: trimmed, timestamp: Date.now() });
+      while (items.length > MAX_HISTORY_ITEMS) {
+        items.shift();
+      }
       writeHistory(storage, historyKey, items);
     }
 

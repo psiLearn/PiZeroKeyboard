@@ -437,14 +437,14 @@ module Tests =
     [<Fact>]
     let ``buildStatusNodes respects flags`` () =
         let settings: SenderSettings = { TargetIp = "127.0.0.1"; TargetPort = 5000 }
-        let nodes1 = buildStatusNodes true settings Idle
-        let nodes2 = buildStatusNodes false settings (Success 1)
-        let nodes3 = buildStatusNodes true settings (Success 1)
-        let nodes4 = buildStatusNodes true settings (Failure "oops")
+        let nodes1 = buildStatusNodes true settings Idle None
+        let nodes2 = buildStatusNodes false settings (Success 1) None
+        let nodes3 = buildStatusNodes true settings (Success 1) None
+        let nodes4 = buildStatusNodes true settings (Failure "oops") None
         let nodes5 = buildStatusNodes true settings (Sending { BytesSent = 50; TotalBytes = 100 }) None
         
         Assert.Empty(nodes1)
-        Assert.Empty(nodes2)
+        Assert.Equal(1, nodes2.Length)
         Assert.Equal(1, nodes3.Length)
         Assert.Equal(1, nodes4.Length)
         Assert.Equal(1, nodes5.Length)
@@ -467,8 +467,8 @@ module Tests =
               SendStartTime = None }
         let withTarget = renderHeader settings model true
         let withoutTarget = renderHeader settings model false
-        Assert.Equal(4, withTarget.Length)
-        Assert.Equal(3, withoutTarget.Length)
+        Assert.Equal(3, withTarget.Length)
+        Assert.Equal(2, withoutTarget.Length)
 
     [<Fact>]
     let ``status websocket sends initial payload`` () =
@@ -535,8 +535,8 @@ module Tests =
             let! response = client.GetAsync("/")
             Assert.Equal(HttpStatusCode.OK, response.StatusCode)
             let! body = response.Content.ReadAsStringAsync()
-            Assert.Contains("id=\"history-back\"", body)
-            Assert.Contains("id=\"history-forward\"", body)
+            Assert.Contains("id=\"history-prev\"", body)
+            Assert.Contains("id=\"history-next\"", body)
             Assert.Contains("src=\"/history.js\"", body)
             Assert.Contains("src=\"/sender.js\"", body)
         }

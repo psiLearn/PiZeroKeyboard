@@ -47,6 +47,7 @@ module HistoryTests =
         member val WebSocket = ctor with get, set
         member _.setTimeout(_: obj, _: obj) = 0
 
+    [<AllowNullLiteral>]
     type DomElement(engine: Engine, id: string, ?closestTarget: obj) =
         let handlers = Dictionary<string, JsValue>()
         member val id = id with get, set
@@ -59,12 +60,13 @@ module HistoryTests =
         member _.getAttribute(_: string) = null
         member _.setSelectionRange(_: int, _: int) = ()
         member _.focus() = ()
+        member _.submit() = ()
         member _.addEventListener(name: string, callback: JsValue) =
             handlers.[name] <- callback
         member _.click() =
             match handlers.TryGetValue("click") with
             | true, callback ->
-                engine.Invoke(callback, JsValue.Undefined, [| EventStub() |]) |> ignore
+                engine.Invoke(callback, EventStub()) |> ignore
             | _ -> ()
         member _.closest(selector: string) =
             if selector = "form" then
@@ -72,6 +74,7 @@ module HistoryTests =
             else
                 null
 
+    [<AllowNullLiteral>]
     type DocumentStub(engine: Engine, elements: IDictionary<string, DomElement>) =
         let mutable domReady: JsValue option = None
         member _.addEventListener(name: string, callback: JsValue) =
@@ -82,7 +85,7 @@ module HistoryTests =
             | true, element -> element
             | _ -> null
         member _.querySelectorAll(_: string) =
-            engine.Realm.Intrinsics.Array.Construct(Arguments.Empty)
+            engine.Evaluate("[]")
         member _.TriggerDOMContentLoaded() =
             match domReady with
             | Some callback -> engine.Invoke(callback, JsValue.Undefined, [||]) |> ignore
@@ -103,23 +106,27 @@ module HistoryTests =
         let elements = Dictionary<string, DomElement>()
         let form = DomElement(engine, "form")
         let textarea = DomElement(engine, "text", form)
-        let back = DomElement(engine, "history-back")
-        let forward = DomElement(engine, "history-forward")
+        let back = DomElement(engine, "history-prev")
+        let forward = DomElement(engine, "history-next")
         elements.["form"] <- form
         elements.["text"] <- textarea
-        elements.["history-back"] <- back
-        elements.["history-forward"] <- forward
+        elements.["history-prev"] <- back
+        elements.["history-next"] <- forward
 
         let document = DocumentStub(engine, elements)
         let window = WindowStub(engine)
         engine.SetValue("document", document) |> ignore
         engine.SetValue("window", window) |> ignore
         engine.SetValue("WebSocket", window.WebSocket) |> ignore
+        engine.SetValue("location", window.location) |> ignore
+        engine.SetValue("setTimeout", Func<obj, obj, int>(fun cb delay -> window.setTimeout(cb, delay))) |> ignore
         let historyPath =
             Path.Combine(__SOURCE_DIRECTORY__, "..", "SenderApp", "wwwroot", "history.js")
         let senderPath =
             Path.Combine(__SOURCE_DIRECTORY__, "..", "SenderApp", "wwwroot", "sender.js")
         engine.Execute(File.ReadAllText(historyPath)) |> ignore
+        let historyApi = engine.GetValue("window").AsObject().Get("LinuxKeyHistory")
+        engine.SetValue("LinuxKeyHistory", historyApi) |> ignore
         engine.Execute(File.ReadAllText(senderPath)) |> ignore
         engine, document
 
@@ -132,7 +139,14 @@ module HistoryTests =
     let jsArrayToStrings (value: JsValue) =
         let array = value.AsArray()
         let length = int (array.Get("length").AsNumber())
-        [ for i in 0 .. length - 1 -> array.Get(i).ToString() ]
+        [ for i in 0 .. length - 1 ->
+            let item = array.Get(i)
+            if item.IsString() then
+                item.AsString()
+            elif item.IsObject() && item.AsObject().HasProperty("text") then
+                item.AsObject().Get("text").ToString()
+            else
+                item.ToString() ]
 
     let jsState (value: JsValue) =
         let obj = value.AsObject()
@@ -241,8 +255,8 @@ module HistoryTests =
         let (engine, document) = loadSenderDomEngine storage
 
         document.TriggerDOMContentLoaded()
-        engine.Execute("elements['history-back'].click();") |> ignore
+        document.getElementById("history-prev").click()
 
-        let value = engine.Evaluate("elements['text'].value").ToString()
+        let value = document.getElementById("text").value
         Assert.Equal("first", value)
         Assert.Equal("0", storage.getItem(historyIndexKey))

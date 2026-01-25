@@ -141,8 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const textarea = document.getElementById('text');
   const form = textarea ? textarea.closest('form') : null;
-  const historyBack = document.getElementById('history-back');
-  const historyForward = document.getElementById('history-forward');
+  const historyBack = document.getElementById('history-prev') || document.getElementById('history-back');
+  const historyForward = document.getElementById('history-next') || document.getElementById('history-forward');
   const historyKey = 'linuxkey-history';
   const historyIndexKey = 'linuxkey-history-index';
   const historyApi = globalThis.LinuxKeyHistory;
@@ -180,6 +180,53 @@ document.addEventListener('DOMContentLoaded', () => {
     textarea.focus();
   };
 
+  const historyToggle = document.getElementById('history-toggle');
+  const historyList = document.getElementById('history-list');
+
+  const getHistoryText = (item) => (
+    typeof item === 'string' ? item : (item?.text ?? '')
+  );
+
+  const formatHistoryItem = (item) => {
+    if (historyApi && typeof historyApi.formatHistoryPreview === 'function') {
+      return historyApi.formatHistoryPreview(item);
+    }
+    return getHistoryText(item);
+  };
+
+  const renderHistoryList = () => {
+    if (!historyList) return;
+    historyList.innerHTML = '';
+
+    if (!historyItems.length) {
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = 'No history yet.';
+      historyList.appendChild(empty);
+      return;
+    }
+
+    historyItems.forEach((item, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'history-item';
+      if (index === historyIndex) {
+        button.classList.add('active');
+      }
+      button.textContent = formatHistoryItem(item);
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        historyIndex = index;
+        persistHistoryIndex(historyIndex);
+        applyHistory(historyIndex, historyItems);
+        updateHistoryButtons(historyIndex, historyItems);
+        renderHistoryList();
+        historyList.classList.add('hidden');
+      });
+      historyList.appendChild(button);
+    });
+  };
+
   let historyItems = [];
   let historyIndex = 0;
 
@@ -203,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     historyItems = state.items;
     historyIndex = state.index;
     updateHistoryButtons(historyIndex, historyItems);
+    renderHistoryList();
   };
 
   if (historyBack || historyForward) {
@@ -216,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
           persistHistoryIndex(historyIndex);
           applyHistory(historyIndex, historyItems);
           updateHistoryButtons(historyIndex, historyItems);
+          renderHistoryList();
         }
       });
     }
@@ -228,6 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
           persistHistoryIndex(historyIndex);
           applyHistory(historyIndex, historyItems);
           updateHistoryButtons(historyIndex, historyItems);
+          renderHistoryList();
         }
       });
     }
@@ -254,16 +304,16 @@ document.addEventListener('DOMContentLoaded', () => {
         historyItems = state.items;
         historyIndex = state.index;
         updateHistoryButtons(historyIndex, historyItems);
+        renderHistoryList();
       }
     });
   }
 
   // Handle history toggle button
-  const historyToggle = document.getElementById('history-toggle');
-  const historyList = document.getElementById('history-list');
   if (historyToggle && historyList) {
     historyToggle.addEventListener('click', (event) => {
       event.preventDefault();
+      renderHistoryList();
       historyList.classList.toggle('hidden');
     });
   }
