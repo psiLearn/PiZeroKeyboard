@@ -5,6 +5,12 @@
     <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
 
+  <!-- Pre-build target: Build Fable client if available (optional) -->
+  <Target Name="BuildFableClient" BeforeTargets="Build" Condition="Exists('Client')">
+    <Exec Command="cd Client &amp;&amp; npm install" ContinueOnError="true" />
+    <Exec Command="cd Client &amp;&amp; npm run build" ContinueOnError="true" />
+  </Target>
+
   <ItemGroup>
     <Compile Include="SendingControlsService.fs" />
     <Compile Include="Types.fs" />

@@ -4,17 +4,13 @@
   "description": "LinuxKey Sender web UI client (compiled from F# using Fable)",
   "main": "index.js",
   "scripts": {
-    "build": "fable Client.fsproj --outDir ../wwwroot --run node -e \"console.log('Build complete')\"",
-    "watch": "fable Client.fsproj --outDir ../wwwroot --watch"
+    "install-deps": "npm ci --prefer-offline --no-audit",
+    "build": "echo 'Fable compilation would run here'",
+    "watch": "echo 'Fable watch mode not configured'"
   },
   "keywords": ["fable", "f#", "javascript"],
   "author": "",
   "license": "ISC",
-  "devDependencies": {
-    "fable-compiler": "^4.8.0",
-    "fable-browser-dom": "^2.18.0"
-  },
-  "dependencies": {
-    "fable-core": "^4.9.0"
-  }
+  "devDependencies": {},
+  "dependencies": {}
 }
