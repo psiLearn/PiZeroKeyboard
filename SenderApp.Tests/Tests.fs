@@ -216,6 +216,45 @@ module Tests =
         Assert.False(parseBool false "maybe")
 
     [<Fact>]
+    let ``validateDelay enforces bounds`` () =
+        Assert.Equal(Error "Delay must be non-negative", validateDelay -1)
+        Assert.Equal(Error "Delay cannot exceed 10000ms", validateDelay 10001)
+        Assert.Equal(Ok 0, validateDelay 0)
+        Assert.Equal(Ok 250, validateDelay 250)
+
+    [<Fact>]
+    let ``validateChunkSize enforces bounds`` () =
+        Assert.Equal(Error "Chunk size must be at least 1", validateChunkSize 0)
+        Assert.Equal(Error "Chunk size cannot exceed 10000", validateChunkSize 10001)
+        Assert.Equal(Ok 1, validateChunkSize 1)
+        Assert.Equal(Ok 256, validateChunkSize 256)
+
+    [<Fact>]
+    let ``normalizeLineEndings converts to LF`` () =
+        let input = "a\r\nb\rc\n"
+        let output = normalizeLineEndings input
+        Assert.Equal("a\nb\nc\n", output)
+
+    [<Fact>]
+    let ``processText applies normalization and newline`` () =
+        let controls =
+            { defaultControls with
+                NormalizeLineEndings = true
+                AppendNewlineAtEnd = true }
+        let result = processText "a\r\nb" controls
+        Assert.Equal("a\nb\n", result)
+
+    [<Fact>]
+    let ``estimateSendTime accounts for chunking and delay`` () =
+        let controls =
+            { defaultControls with
+                TypingDelayMs = 2
+                ChunkSize = 4
+                SendMode = ChunkedWithDelay (4, 10) }
+        let result = estimateSendTime "abcdefgh" controls
+        Assert.Equal(26, result)
+
+    [<Fact>]
     let ``envOrDefault returns fallback and value`` () =
         let fallback =
             withEnv "SENDER_SAMPLE" None (fun () -> envOrDefault "SENDER_SAMPLE" "fallback")

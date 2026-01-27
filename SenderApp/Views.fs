@@ -262,116 +262,115 @@ module Views =
     let private renderKeyRowDisabled rowClass specs =
         div [ _class rowClass ] (specs |> List.map specialKeyButtonDisabled)
 
+    let private renderFunctionKeysGroup isConnected =
+        let functionKeys =
+            [ "F1"; "F2"; "F3"; "F4"; "F5"; "F6"; "F7"; "F8"; "F9"; "F10"; "F11"; "F12" ]
+            |> List.map (fun label -> { Label = label; Token = sprintf "{%s}" label; ExtraClass = "" })
+        div [ _class "key-group function-keys-group" ] [
+            div [ _class "key-group-label" ] [ str "Function Keys" ]
+            if isConnected then
+                renderKeyRow "key-row function-row" functionKeys
+            else
+                renderKeyRowDisabled "key-row function-row" functionKeys
+        ]
+
+    let private renderNavigationKeysGroup isConnected =
+        let utilityKeys =
+            [ { Label = "Print"; Token = "{PRINT}"; ExtraClass = "" }
+              { Label = "Scroll"; Token = "{SCROLLLOCK}"; ExtraClass = "" }
+              { Label = "Pause"; Token = "{PAUSE}"; ExtraClass = "" } ]
+        let navKeys =
+            [ { Label = "Ins"; Token = "{INSERT}"; ExtraClass = "" }
+              { Label = "Home"; Token = "{HOME}"; ExtraClass = "" }
+              { Label = "End"; Token = "{END}"; ExtraClass = "" }
+              { Label = "PgUp"; Token = "{PAGEUP}"; ExtraClass = "" }
+              { Label = "PgDn"; Token = "{PAGEDOWN}"; ExtraClass = "" } ]
+        div [ _class "key-group navigation-group" ] [
+            div [ _class "key-group-label" ] [ str "Navigation & Utilities" ]
+            div [ _class "nav-cluster" ] [
+                if isConnected then
+                    renderKeyRow "key-row utility-row" utilityKeys
+                else
+                    renderKeyRowDisabled "key-row utility-row" utilityKeys
+
+                div [ _class "key-row nav-row" ] [
+                    if isConnected then
+                        yield! navKeys |> List.map specialKeyButton
+                    else
+                        yield! navKeys |> List.map specialKeyButtonDisabled
+                ]
+            ]
+        ]
+
+    let private renderEditingKeysGroup isConnected =
+        let row1 =
+            [ { Label = "Esc"; Token = "{ESC}"; ExtraClass = "" }
+              { Label = "Tab"; Token = "{TAB}"; ExtraClass = "wide-2" }
+              { Label = "Enter"; Token = "{ENTER}"; ExtraClass = "wide-2" }
+              { Label = "Backspace"; Token = "{BACKSPACE}"; ExtraClass = "wide-3" }
+              { Label = "Delete"; Token = "{DELETE}"; ExtraClass = "wide-2" } ]
+        div [ _class "key-group editing-group" ] [
+            div [ _class "key-group-label" ] [ str "Editing Keys" ]
+            if isConnected then
+                renderKeyRow "key-row keyboard-row" row1
+            else
+                renderKeyRowDisabled "key-row keyboard-row" row1
+        ]
+
+    let private renderModifiersGroup isConnected =
+        let row2Modifiers =
+            [ { Label = "Ctrl"; Token = "{CTRL}"; ExtraClass = "wide-2"; IsModifier = true }
+              { Label = "Win"; Token = "{WIN}"; ExtraClass = "wide-2"; IsModifier = true }
+              { Label = "Alt"; Token = "{ALT}"; ExtraClass = "wide-2"; IsModifier = true }
+              { Label = "Space"; Token = " "; ExtraClass = "wide-4"; IsModifier = false }
+              { Label = "Shift"; Token = "{SHIFT}"; ExtraClass = "wide-2"; IsModifier = true } ]
+        let renderButton spec =
+            if spec.IsModifier then
+                if isConnected then
+                    modifierKeyButton { Label = spec.Label; Token = spec.Token; ExtraClass = spec.ExtraClass; IsModifier = true }
+                else
+                    modifierKeyButtonDisabled { Label = spec.Label; Token = spec.Token; ExtraClass = spec.ExtraClass; IsModifier = true }
+            else if isConnected then
+                specialKeyButton { Label = spec.Label; Token = spec.Token; ExtraClass = spec.ExtraClass }
+            else
+                specialKeyButtonDisabled { Label = spec.Label; Token = spec.Token; ExtraClass = spec.ExtraClass }
+        div [ _class "key-group modifiers-group" ] [
+            div [ _class "key-group-label" ] [ str "Modifiers (click to latch/toggle)" ]
+            div [ _class "key-row keyboard-row" ] (row2Modifiers |> List.map renderButton)
+        ]
+
+    let private renderArrowsAndShortcutsGroup isConnected =
+        let upKey = [ { Label = "Up"; Token = "{UP}"; ExtraClass = "" } ]
+        let downKeys =
+            [ { Label = "Left"; Token = "{LEFT}"; ExtraClass = "" }
+              { Label = "Down"; Token = "{DOWN}"; ExtraClass = "" }
+              { Label = "Right"; Token = "{RIGHT}"; ExtraClass = "" } ]
+        let shortcuts =
+            [ "Ctrl+A"; "Ctrl+C"; "Ctrl+V"; "Ctrl+X"; "Ctrl+Z" ]
+            |> List.map (fun label -> { Label = label; Token = sprintf "{%s}" label; ExtraClass = "" })
+        div [ _class "key-group arrows-group" ] [
+            div [ _class "key-group-label" ] [ str "Navigation & Shortcuts" ]
+            div [ _class "arrow-cluster" ] [
+                if isConnected then
+                    renderKeyRow "arrow-row" upKey
+                    renderKeyRow "arrow-row" downKeys
+                else
+                    renderKeyRowDisabled "arrow-row" upKey
+                    renderKeyRowDisabled "arrow-row" downKeys
+            ]
+            if isConnected then
+                renderKeyRow "key-row shortcut-row" shortcuts
+            else
+                renderKeyRowDisabled "key-row shortcut-row" shortcuts
+        ]
+
     let renderSpecialKeys isConnected =
         div [ _class "special-keys" ] [
-            // Function Keys Row
-            div [ _class "key-group function-keys-group" ] [
-                div [ _class "key-group-label" ] [ str "Function Keys" ]
-                let functionKeys =
-                    [ "F1"; "F2"; "F3"; "F4"; "F5"; "F6"; "F7"; "F8"; "F9"; "F10"; "F11"; "F12" ]
-                    |> List.map (fun label -> { Label = label; Token = sprintf "{%s}" label; ExtraClass = "" })
-                if isConnected then
-                    renderKeyRow "key-row function-row" functionKeys
-                else
-                    renderKeyRowDisabled "key-row function-row" functionKeys
-            ]
-            
-            // Navigation & Utility Keys
-            div [ _class "key-group navigation-group" ] [
-                div [ _class "key-group-label" ] [ str "Navigation & Utilities" ]
-                div [ _class "nav-cluster" ] [
-                    // Top row: Print, Scroll, Pause
-                    let utilityKeys =
-                        [ { Label = "Print"; Token = "{PRINT}"; ExtraClass = "" }
-                          { Label = "Scroll"; Token = "{SCROLLLOCK}"; ExtraClass = "" }
-                          { Label = "Pause"; Token = "{PAUSE}"; ExtraClass = "" } ]
-                    if isConnected then
-                        renderKeyRow "key-row utility-row" utilityKeys
-                    else
-                        renderKeyRowDisabled "key-row utility-row" utilityKeys
-                    
-                    // Bottom row: Insert, Home, End, PgUp, PgDn
-                    div [ _class "key-row nav-row" ] [
-                        let navKeys =
-                            [ { Label = "Ins"; Token = "{INSERT}"; ExtraClass = "" }
-                              { Label = "Home"; Token = "{HOME}"; ExtraClass = "" }
-                              { Label = "End"; Token = "{END}"; ExtraClass = "" }
-                              { Label = "PgUp"; Token = "{PAGEUP}"; ExtraClass = "" }
-                              { Label = "PgDn"; Token = "{PAGEDOWN}"; ExtraClass = "" } ]
-                        if isConnected then
-                            yield! navKeys |> List.map specialKeyButton
-                        else
-                            yield! navKeys |> List.map specialKeyButtonDisabled
-                    ]
-                ]
-            ]
-            
-            // Main Keyboard Block
-            div [ _class "key-group editing-group" ] [
-                div [ _class "key-group-label" ] [ str "Editing Keys" ]
-                let row1 =
-                    [ { Label = "Esc"; Token = "{ESC}"; ExtraClass = "" }
-                      { Label = "Tab"; Token = "{TAB}"; ExtraClass = "wide-2" }
-                      { Label = "Enter"; Token = "{ENTER}"; ExtraClass = "wide-2" }
-                      { Label = "Backspace"; Token = "{BACKSPACE}"; ExtraClass = "wide-3" }
-                      { Label = "Delete"; Token = "{DELETE}"; ExtraClass = "wide-2" } ]
-                if isConnected then
-                    renderKeyRow "key-row keyboard-row" row1
-                else
-                    renderKeyRowDisabled "key-row keyboard-row" row1
-            ]
-            
-            // Modifier Keys Row
-            div [ _class "key-group modifiers-group" ] [
-                div [ _class "key-group-label" ] [ str "Modifiers (click to latch/toggle)" ]
-                let row2Modifiers =
-                    [ { Label = "Ctrl"; Token = "{CTRL}"; ExtraClass = "wide-2"; IsModifier = true }
-                      { Label = "Win"; Token = "{WIN}"; ExtraClass = "wide-2"; IsModifier = true }
-                      { Label = "Alt"; Token = "{ALT}"; ExtraClass = "wide-2"; IsModifier = true }
-                      { Label = "Space"; Token = " "; ExtraClass = "wide-4"; IsModifier = false }
-                      { Label = "Shift"; Token = "{SHIFT}"; ExtraClass = "wide-2"; IsModifier = true } ]
-                div [ _class "key-row keyboard-row" ] 
-                    (row2Modifiers |> List.map (fun spec ->
-                        if spec.IsModifier then
-                            if isConnected then
-                                modifierKeyButton { Label = spec.Label; Token = spec.Token; ExtraClass = spec.ExtraClass; IsModifier = true }
-                            else
-                                modifierKeyButtonDisabled { Label = spec.Label; Token = spec.Token; ExtraClass = spec.ExtraClass; IsModifier = true }
-                        else
-                            if isConnected then
-                                specialKeyButton { Label = spec.Label; Token = spec.Token; ExtraClass = spec.ExtraClass }
-                            else
-                                specialKeyButtonDisabled { Label = spec.Label; Token = spec.Token; ExtraClass = spec.ExtraClass }))
-            ]
-            
-            // Arrows & Common Shortcuts
-            div [ _class "key-group arrows-group" ] [
-                div [ _class "key-group-label" ] [ str "Navigation & Shortcuts" ]
-                div [ _class "arrow-cluster" ] [
-                    // Arrow keys
-                    let upKey = [ { Label = "Up"; Token = "{UP}"; ExtraClass = "" } ]
-                    let downKeys =
-                        [ { Label = "Left"; Token = "{LEFT}"; ExtraClass = "" }
-                          { Label = "Down"; Token = "{DOWN}"; ExtraClass = "" }
-                          { Label = "Right"; Token = "{RIGHT}"; ExtraClass = "" } ]
-                    
-                    if isConnected then
-                        renderKeyRow "arrow-row" upKey
-                        renderKeyRow "arrow-row" downKeys
-                    else
-                        renderKeyRowDisabled "arrow-row" upKey
-                        renderKeyRowDisabled "arrow-row" downKeys
-                ]
-                
-                // Common shortcuts
-                let shortcuts =
-                    [ "Ctrl+A"; "Ctrl+C"; "Ctrl+V"; "Ctrl+X"; "Ctrl+Z" ]
-                    |> List.map (fun label -> { Label = label; Token = sprintf "{%s}" label; ExtraClass = "" })
-                if isConnected then
-                    renderKeyRow "key-row shortcut-row" shortcuts
-                else
-                    renderKeyRowDisabled "key-row shortcut-row" shortcuts
-            ]
+            renderFunctionKeysGroup isConnected
+            renderNavigationKeysGroup isConnected
+            renderEditingKeysGroup isConnected
+            renderModifiersGroup isConnected
+            renderArrowsAndShortcutsGroup isConnected
         ]
 
     let renderHint () =
