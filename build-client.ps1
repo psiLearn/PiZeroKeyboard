@@ -7,6 +7,15 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ClientDir = Join-Path $ScriptDir "SenderApp" "Client"
 
 Write-Host "Building Fable client..." -ForegroundColor Cyan
+
+Push-Location $ScriptDir
+try {
+    Write-Host "Restoring dotnet tools..." -ForegroundColor Yellow
+    dotnet tool restore
+} finally {
+    Pop-Location
+}
+
 Push-Location $ClientDir
 
 try {

@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "install-deps": "npm ci --prefer-offline --no-audit",
-    "build": "echo 'Fable compilation would run here'",
-    "watch": "echo 'Fable watch mode not configured'"
+    "build": "dotnet fable . --outDir ../wwwroot --extension .js --noCache",
+    "watch": "dotnet fable watch . --outDir ../wwwroot --extension .js --noCache"
   },
   "keywords": ["fable", "f#", "javascript"],
   "author": "",

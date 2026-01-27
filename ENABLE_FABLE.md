@@ -2,38 +2,25 @@
 
 ## Quick Start
 
-Fable compilation is **integrated but optional** in the build process.
+Fable compilation is **integrated** in the build process.
 
-### To use Fable now:
+### To build the client now:
 
-1. **Install npm packages:**
+1. **Restore dotnet tools** (from repo root):
+   ```bash
+   dotnet tool restore
+   ```
+
+2. **Install npm packages:**
    ```bash
    cd SenderApp/Client
    npm install
    ```
 
-2. **Choose Fable version** and update `package.json`:
-   - Check available versions: `npm view fable-compiler versions`
-   - Recommended: v2.13.0 or latest stable (v4.x)
-
-3. **Edit `SenderApp/Client/package.json`:**
-   ```json
-   {
-     "devDependencies": {
-       "fable-compiler": "2.13.0"
-     },
-     "dependencies": {
-       "fable-core": "1.3.8"
-     }
-   }
-   ```
-
-4. **Build with Fable:**
+3. **Build with Fable:**
    ```bash
-   cd SenderApp/Client
-   npm install
    npm run build
-   
+
    # Or build entire project:
    dotnet build SenderApp/SenderApp.fsproj
    ```
@@ -41,25 +28,25 @@ Fable compilation is **integrated but optional** in the build process.
 ## Current State
 
 ### ✅ Enabled Features
-- **Pre-build target** in `SenderApp.fsproj` runs Fable before main build
+- **Pre-build target** in `SenderApp.fsproj` runs the client build before main build
 - **Client project** setup: F# sources in `SenderApp/Client/src/`
-- **Graceful fallback**: Build succeeds even if Fable build fails (ContinueOnError=true)
-- **Static file serving**: wwwroot compiled JS served automatically
+- **Tooling**: local `dotnet fable` via `dotnet-tools.json`
+- **Static file serving**: compiled JS served from `wwwroot/src/`
 
 ### 📋 Setup Status
 - Client.fsproj: ✅ Configured
-- fable.json: ✅ Ready (outputs to ../wwwroot)
-- package.json: ✅ Configured (stub commands for now)
-- src/Sender.fs: ⏳ Stubs present (needs completion)
-- src/History.fs: ⏳ Stubs present (needs completion)
+- fable.json: ✅ Ready (outputs to `../wwwroot/src`)
+- package.json: ✅ Uses `dotnet fable`
+- src/Sender.fs: ✅ Implemented
+- src/History.fs: ✅ Implemented
+- src/HistoryCore.fs: ✅ Implemented
 
 ### 🚀 Current Implementation
-The app currently uses **hand-written JavaScript** (not Fable):
-- **sender.js** (305 lines) - Full Phase 4 implementation ✅
-- **history.js** (132 lines) - Storage + migration ✅  
-- **sender.css** (300+ lines) - Complete styling ✅
-
-This provides the same functionality and is currently **production-ready**.
+The app uses **Fable-generated JavaScript**:
+- **wwwroot/src/Sender.js** - UI + WebSocket + history interactions
+- **wwwroot/src/History.js** - Local storage wrapper
+- **wwwroot/src/HistoryCore.js** - Pure history logic
+- **sender.css** - Complete styling ✅
 
 ## Integration Points
 
@@ -69,11 +56,13 @@ dotnet build SenderApp/SenderApp.fsproj
     ↓
 [Pre-build: BuildFableClient target]
     ↓
+dotnet tool restore
+    ↓
 cd SenderApp/Client && npm install
     ↓
-npm run build (→ fable compile when enabled)
+npm run build (→ dotnet fable)
     ↓
-Outputs to ../wwwroot/ (included in static files)
+Outputs to ../wwwroot/src/ (included in static files)
     ↓
 [Main build: SenderApp]
     ↓
@@ -81,42 +70,18 @@ bin/Release/SenderApp.dll
 ```
 
 ### File Mapping
-- `SenderApp/Client/src/Sender.fs` → `SenderApp/wwwroot/sender.js`
-- `SenderApp/Client/src/History.fs` → `SenderApp/wwwroot/history.js`
-
-## Next: Completing Fable Implementation
-
-To fully switch from JavaScript to Fable:
-
-1. **Install Fable CLI globally** (optional):
-   ```bash
-   npm install -g fable-compiler@2.13.0
-   ```
-
-2. **Complete F# source files**:
-   - Review current JavaScript implementation
-   - Rewrite in F# with proper JSInterop
-   - Test compilation
-
-3. **Verify output**:
-   - Compare generated JS with hand-written version
-   - Check bundle size and performance
-   - Test in browser
-
-4. **Switch to Fable output**:
-   ```bash
-   npm run build
-   dotnet build SenderApp
-   ```
+- `SenderApp/Client/src/Sender.fs` → `SenderApp/wwwroot/src/Sender.js`
+- `SenderApp/Client/src/History.fs` → `SenderApp/wwwroot/src/History.js`
+- `SenderApp/Client/src/HistoryCore.fs` → `SenderApp/wwwroot/src/HistoryCore.js`
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
 | `npm install` fails | Run `npm cache clean --force` then retry |
-| Package not found | Check version exists: `npm view <package> versions` |
-| Fable won't compile | Ensure F# syntax is valid, run `fable --help` |
-| JS not updating | Clear `wwwroot` and rebuild: `npm run build` |
+| Tool restore fails | Run `dotnet tool restore` from repo root |
+| Fable won't compile | Ensure F# syntax is valid, run `dotnet fable --help` |
+| JS not updating | Clear `wwwroot/src` and rebuild: `npm run build` |
 
 ## Documentation
 
@@ -127,5 +92,5 @@ To fully switch from JavaScript to Fable:
 ## See Also
 
 - [FABLE_SETUP.md](FABLE_SETUP.md) - Detailed setup guide
-- [SenderApp/wwwroot/sender.js](SenderApp/wwwroot/sender.js) - Current JS implementation
-- [SenderApp/Client/src/Sender.fs](SenderApp/Client/src/Sender.fs) - F# stubs to complete
+- [SenderApp/wwwroot/src/Sender.js](SenderApp/wwwroot/src/Sender.js) - Current JS output
+- [SenderApp/Client/src/Sender.fs](SenderApp/Client/src/Sender.fs) - F# source

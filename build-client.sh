@@ -7,6 +7,10 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 CLIENT_DIR="$SCRIPT_DIR/SenderApp/Client"
 
 echo "Building Fable client..."
+
+echo "Restoring dotnet tools..."
+(cd "$SCRIPT_DIR" && dotnet tool restore)
+
 cd "$CLIENT_DIR"
 
 # Install npm dependencies if needed

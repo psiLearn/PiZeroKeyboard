@@ -1,394 +1,356 @@
-namespace SenderApp.Client
+module SenderApp.Client.Sender
 
+open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.Core.JS
+open SenderApp.Client.History
+open SenderApp.Client.HistoryCore
 
-[<Global>]
-type Document =
-    static member getElementById(id: string): obj = jsNative
-    static member querySelectorAll(selector: string): obj = jsNative
-    static member readyState: string = jsNative
-    static member addEventListener(event: string, handler: obj -> unit): unit = jsNative
+[<Emit("document")>]
+let document: obj = jsNative
 
-[<Global>]
-let document: Document = jsNative
+[<Emit("globalThis")>]
+let globalThis: obj = jsNative
 
-[<Global>]
-type GlobalThis =
-    static member location: obj = jsNative
-    static member navigator: obj = jsNative
-    static member setTimeout(fn: unit -> unit, ms: float): float = jsNative
-    static member setInterval(fn: unit -> unit, ms: float): float = jsNative
-    static member clearInterval(id: float): unit = jsNative
+[<Emit("document.getElementById($0)")>]
+let getElementById (id: string): obj = jsNative
 
-[<Global>]
-let globalThis: GlobalThis = jsNative
+[<Emit("document.querySelectorAll($0)")>]
+let querySelectorAll (selector: string): obj = jsNative
 
-module Sender =
-    open History
-    
-    let mutable autoRetryEnabled = false
-    let mutable autoRetryTimer: float option = None
-    let mutable retryCountdownTimer: float option = None
-    let mutable nextRetryCountdown = 0
-    
-    let mutable historyItems: obj[] = [||]
-    let mutable historyIndex = 0
+[<Emit("document.createElement($0)")>]
+let createElement (tag: string): obj = jsNative
 
-    // ===== Status Dot Management =====
-    let setDot (element: obj) baseClass text cssClass =
-        if not (isNull element) then
-            let className = if String.length cssClass > 0 then sprintf "%s %s" baseClass cssClass else baseClass
-            element?className <- className
-            element?setAttribute("title", text)
-            element?setAttribute("aria-label", text)
+[<Emit("new WebSocket($0)")>]
+let newWebSocket (url: string): obj = jsNative
 
-    let applyStatus (data: obj) =
-        let statusEl = document.getElementById "usb-status"
-        let capsEl = document.getElementById "caps-status"
-        
-        let text = 
-            try
-                let t = data?text
-                if isNull t then "Raspberry Pi USB: unknown" else unbox<string> t
-            with _ -> "Raspberry Pi USB: unknown"
-        
-        let cssClass = 
-            try
-                let c = data?cssClass
-                if isNull c then "unknown" else unbox<string> c
-            with _ -> "unknown"
-        
-        let capsText = 
-            try
-                let t = data?capsText
-                if isNull t then "Caps Lock: unknown" else unbox<string> t
-            with _ -> "Caps Lock: unknown"
-        
-        let capsCssClass = 
-            try
-                let c = data?capsCssClass
-                if isNull c then "unknown" else unbox<string> c
-            with _ -> "unknown"
-        
-        setDot statusEl "usb-dot" text cssClass
-        setDot capsEl "caps-dot" capsText capsCssClass
+let mutable autoRetryEnabled = false
+let mutable autoRetryTimer: obj option = None
+let mutable retryCountdownTimer: obj option = None
+let mutable nextRetryCountdown = 0
 
-    let refreshStatus () =
-        let refreshBtn = document.getElementById "refresh-status"
-        
-        if not (isNull refreshBtn) then
-            refreshBtn?disabled <- true
-        
-        [<Emit("fetch('/status', { cache: 'no-store' }).then(resp => { if (resp.ok) return resp.json(); throw new Error('HTTP ' + resp.status); }).then(data => { $data = data; }).catch(err => { $data = null; }).finally(() => { if ($btn) $btn.disabled = false; })")>]
-        let performFetch (btn: obj) (data: obj byref): unit = jsNative
-        
-        let mutable data = null
-        performFetch refreshBtn &data
-        
-        if not (isNull data) then
-            applyStatus data
-        else
-            applyStatus (createObj ["text" ==> "Raspberry Pi USB: unknown (refresh failed)"; "cssClass" ==> "unknown"])
+let mutable historyItems: HistoryItem list = []
+let mutable historyIndex = 0
 
-    // ===== Auto-Retry Countdown =====
-    let updateRetryCountdown () =
-        let el = document.getElementById "retry-countdown"
-        if not (isNull el) then
-            let text = if nextRetryCountdown > 0 then sprintf "Retrying in %ds…" nextRetryCountdown else ""
-            el?textContent <- text
+let setDot (element: obj) (baseClass: string) (text: string) (cssClass: string) =
+    if not (isNull element) then
+        let cls = if String.IsNullOrWhiteSpace cssClass then baseClass else sprintf "%s %s" baseClass cssClass
+        element?className <- cls
+        element?setAttribute("title", text)
+        element?setAttribute("aria-label", text)
 
-    let startRetryCountdown seconds =
-        nextRetryCountdown <- seconds
-        
-        match retryCountdownTimer with
-        | Some id -> globalThis.clearInterval(id)
-        | None -> ()
+let tryGetString (data: obj) (prop: string) (fallback: string) =
+    try
+        let value: obj = data?(prop)
+        if isNull value then fallback else string value
+    with _ -> fallback
 
+let applyStatus (data: obj) =
+    let statusEl = getElementById "usb-status"
+    let capsEl = getElementById "caps-status"
+    let text = tryGetString data "text" "Raspberry Pi USB: unknown"
+    let cssClass = tryGetString data "cssClass" "unknown"
+    let capsText = tryGetString data "capsText" "Caps Lock: unknown"
+    let capsCssClass = tryGetString data "capsCssClass" "unknown"
+    setDot statusEl "usb-dot" text cssClass
+    setDot capsEl "caps-dot" capsText capsCssClass
+
+[<Emit("fetch('/status', { cache: 'no-store' })\
+    .then(resp => resp.ok ? resp.json() : Promise.reject(new Error(`HTTP ${resp.status}`)))\
+    .then(data => $0(data))\
+    .catch(() => $1())\
+    .finally(() => { if ($2) $2.disabled = false; })")>]
+let fetchStatus (onSuccess: obj -> unit) (onFail: unit -> unit) (btn: obj) : unit = jsNative
+
+let refreshStatus () =
+    let refreshBtn = getElementById "refresh-status"
+    if not (isNull refreshBtn) then
+        refreshBtn?disabled <- true
+    let onFail () =
+        applyStatus (createObj [ "text" ==> "Raspberry Pi USB: unknown (refresh failed)"; "cssClass" ==> "unknown" ])
+    fetchStatus applyStatus onFail refreshBtn
+
+let updateRetryCountdown () =
+    let el = getElementById "retry-countdown"
+    if not (isNull el) then
+        let text = if nextRetryCountdown > 0 then sprintf "Retrying in %ds…" nextRetryCountdown else ""
+        el?textContent <- text
+
+let startRetryCountdown (seconds: int) =
+    nextRetryCountdown <- seconds
+    match retryCountdownTimer with
+    | Some id -> globalThis?clearInterval(id)
+    | None -> ()
+    updateRetryCountdown()
+    let timer = globalThis?setInterval((fun () ->
+        nextRetryCountdown <- nextRetryCountdown - 1
         updateRetryCountdown()
-        
-        let timer = globalThis.setInterval((fun () ->
-            nextRetryCountdown <- nextRetryCountdown - 1
-            updateRetryCountdown()
-            if nextRetryCountdown <= 0 then
-                match retryCountdownTimer with
-                | Some id -> globalThis.clearInterval(id)
+        if nextRetryCountdown <= 0 then
+            match retryCountdownTimer with
+            | Some id -> globalThis?clearInterval(id)
+            | None -> ()
+            retryCountdownTimer <- None), 1000)
+    retryCountdownTimer <- Some timer
+
+let initCopyButton () =
+    let btn = getElementById "copy-target"
+    if not (isNull btn) then
+        btn?addEventListener("click", fun (event: obj) ->
+            event?preventDefault()
+            let display = getElementById "target-display"
+            if not (isNull display) then
+                let text = string display?textContent
+                let clipboard = globalThis?navigator?clipboard
+                if not (isNull clipboard) then
+                    let promise = clipboard?writeText(text)
+                    promise
+                        ?``then``(fun _ ->
+                            let originalText = btn?textContent
+                            btn?textContent <- "✓"
+                            globalThis?setTimeout((fun () -> btn?textContent <- originalText), 1500) |> ignore)
+                        ?``catch``(fun err -> JS.console.error("Failed to copy:", err))
+                    |> ignore)
+
+let initStatusRefresh () =
+    let refreshBtn = getElementById "refresh-status"
+    if not (isNull refreshBtn) then
+        refreshBtn?addEventListener("click", fun (event: obj) ->
+            event?preventDefault()
+            refreshStatus())
+
+let initAutoRetry () =
+    let checkbox = getElementById "auto-retry"
+    if not (isNull checkbox) then
+        checkbox?addEventListener("change", fun (_: obj) ->
+            autoRetryEnabled <- unbox<bool> checkbox?``checked``
+            if autoRetryEnabled then
+                match autoRetryTimer with
+                | Some id -> globalThis?clearInterval(id)
                 | None -> ()
-                retryCountdownTimer <- None), 1000.0)
-
-        retryCountdownTimer <- Some timer
-
-    // ===== Copy Button =====
-    let initCopyButton () =
-        let btn = document.getElementById "copy-target"
-        if not (isNull btn) then
-            btn?addEventListener("click", fun (event: obj) ->
-                event?preventDefault()
-                let display = document.getElementById "target-display"
-                if not (isNull display) then
-                    let text = unbox<string> (display?textContent)
-                    let clipboard = globalThis.navigator?clipboard
-                    if not (isNull clipboard) then
-                        let promise = clipboard?writeText(text)
-                        promise
-                            ?``then``(fun _ ->
-                                let originalText = btn?textContent
-                                btn?textContent <- "✓"
-                                globalThis.setTimeout((fun () -> btn?textContent <- originalText), 1500.0) |> ignore)
-                            ?``catch``(fun err -> 
-                                JS.console.error("Failed to copy:", err)) |> ignore)
-
-    // ===== USB Status & Refresh =====
-    let initStatusRefresh () =
-        let refreshBtn = document.getElementById "refresh-status"
-        if not (isNull refreshBtn) then
-            refreshBtn?addEventListener("click", fun (event: obj) ->
-                event?preventDefault()
-                refreshStatus())
-
-    // ===== Auto-Retry =====
-    let initAutoRetry () =
-        let checkbox = document.getElementById "auto-retry"
-        if not (isNull checkbox) then
-            checkbox?addEventListener("change", fun (_: obj) ->
-                autoRetryEnabled <- unbox<bool> (checkbox?``checked``)
-                
-                if autoRetryEnabled then
-                    match autoRetryTimer with
-                    | Some id -> globalThis.clearInterval(id)
-                    | None -> ()
-
-                    let timer = globalThis.setInterval((fun () ->
-                        let statusEl = document.getElementById "usb-status"
-                        if not (isNull statusEl) then
+                let timer = globalThis?setInterval((fun () ->
+                    let statusEl = getElementById "usb-status"
+                    let isConnected =
+                        if isNull statusEl then false
+                        else
                             try
-                                let hasClass: bool = statusEl?classList.contains("connected")
-                                if not hasClass then
-                                    refreshStatus()
-                                    startRetryCountdown 5
-                            with _ -> ()), 5000.0)
+                                let classList: obj = statusEl?classList
+                                classList?contains("connected") |> unbox<bool>
+                            with _ -> false
+                    if not isConnected then
+                        refreshStatus()
+                        startRetryCountdown 5), 5000)
+                autoRetryTimer <- Some timer
+            else
+                match autoRetryTimer with
+                | Some id -> globalThis?clearInterval(id)
+                | None -> ()
+                autoRetryTimer <- None
+                match retryCountdownTimer with
+                | Some id -> globalThis?clearInterval(id)
+                | None -> ()
+                retryCountdownTimer <- None
+                nextRetryCountdown <- 0
+                updateRetryCountdown())
 
-                    autoRetryTimer <- Some timer
-                else
-                    match autoRetryTimer with
-                    | Some id -> globalThis.clearInterval(id)
-                    | None -> ()
-                    
-                    match retryCountdownTimer with
-                    | Some id -> globalThis.clearInterval(id)
-                    | None -> ()
-                    
-                    nextRetryCountdown <- 0
-                    updateRetryCountdown())
-
-    // ===== WebSocket Connection =====
-    let rec setupWebSocketConnection () =
-        [<Emit("'WebSocket' in globalThis")>]
-        let hasWebSocket: bool = jsNative
-        
-        if hasWebSocket then
-            try
-                let scheme = if unbox<string> (globalThis.location?protocol) = "https:" then "wss:" else "ws:"
-                let host = unbox<string> (globalThis.location?host)
-                let url = sprintf "%s//%s/status/ws" scheme host
-                
-                [<Emit("new WebSocket($0)")>]
-                let createSocket (u: string): obj = jsNative
-                
-                let socket = createSocket url
-                
-                socket?onmessage <- fun (event: obj) ->
-                    try
-                        let json = unbox<obj> (event?data)
-                        let data: obj = [<Emit("JSON.parse($json)")>] (fun () -> jsNative) ()
-                        applyStatus data
-                    with _ ->
-                        applyStatus (createObj ["text" ==> "Raspberry Pi USB: unknown"; "cssClass" ==> "unknown"])
-                
-                socket?onerror <- fun (_: obj) ->
-                    socket?close()
-                
-                socket?onclose <- fun (_: obj) ->
-                    globalThis.setTimeout((fun () -> setupWebSocketConnection()), 3000.0) |> ignore
-            with _ ->
-                globalThis.setTimeout((fun () -> setupWebSocketConnection()), 3000.0) |> ignore
-
-    // ===== Token Insertion =====
-    let insertToken (token: string) =
-        let textarea = document.getElementById "text"
-        if not (isNull textarea) && token.Length > 0 then
-            let start = unbox<int> (textarea?selectionStart)
-            let endSel = unbox<int> (textarea?selectionEnd)
-            let currentValue = unbox<string> (textarea?value)
-            let newValue = sprintf "%s%s%s" (currentValue.Substring(0, start)) token (currentValue.Substring(endSel))
-            
-            textarea?value <- newValue
-            let caret = start + token.Length
-            textarea?setSelectionRange(caret, caret)
-            textarea?focus()
-
-    let initTokenButtons () =
-        let buttons = document.querySelectorAll("[data-token]")
-        if not (isNull buttons) then
-            [<Emit("$0.length")>]
-            let getLength (obj: obj): int = jsNative
-            
-            for i = 0 to (getLength buttons) - 1 do
-                [<Emit("$0.item($1)")>]
-                let getItem (obj: obj) (idx: int): obj = jsNative
-                
-                let button = getItem buttons i
-                if not (isNull button) then
-                    button?addEventListener("click", fun (event: obj) ->
-                        event?preventDefault()
-                        let token = unbox<string> (button?dataset?token)
-                        insertToken token)
-
-    // ===== History Navigation =====
-    let loadHistoryState () =
-        let state = loadHistoryState()
-        historyItems <- state
-        historyIndex <- getIndex()
-        (historyItems, historyIndex)
-
-    let persistHistoryIndex () =
-        saveIndex historyIndex
-
-    let updateHistoryButtons () =
-        let historyBack = document.getElementById "history-back"
-        let historyForward = document.getElementById "history-forward"
-        
-        if not (isNull historyBack) then
-            historyBack?disabled <- historyIndex <= 0
-        if not (isNull historyForward) then
-            historyForward?disabled <- historyIndex >= historyItems.Length - 1
-
-    let applyHistory () =
-        let textarea = document.getElementById "text"
-        if not (isNull textarea) && historyIndex >= 0 && historyIndex < historyItems.Length then
-            let item = historyItems.[historyIndex]
-            let value =
+let rec setupWebSocketConnection () =
+    let hasWebSocket =
+        try not (isNull globalThis?WebSocket)
+        with _ -> false
+    if hasWebSocket then
+        try
+            let scheme = if string (globalThis?location?protocol) = "https:" then "wss:" else "ws:"
+            let host = string (globalThis?location?host)
+            let url = sprintf "%s//%s/status/ws" scheme host
+            let socket = newWebSocket url
+            socket?onmessage <- (fun (event: obj) ->
                 try
-                    let text = unbox<string> (item?text)
-                    text
+                    let data = JS.JSON.parse (string event?data)
+                    applyStatus data
                 with _ ->
-                    ""
-            
-            textarea?value <- value
-            let caret = value.Length
-            textarea?setSelectionRange(caret, caret)
-            textarea?focus()
+                    applyStatus (createObj [ "text" ==> "Raspberry Pi USB: unknown"; "cssClass" ==> "unknown" ]))
+            socket?onerror <- (fun (_: obj) -> socket?close())
+            socket?onclose <- (fun (_: obj) ->
+                globalThis?setTimeout((fun () -> setupWebSocketConnection()), 3000) |> ignore)
+        with _ ->
+            globalThis?setTimeout((fun () -> setupWebSocketConnection()), 3000) |> ignore
 
-    let initHistoryNavigation () =
-        let historyBack = document.getElementById "history-back"
-        let historyForward = document.getElementById "history-forward"
-        
-        if (not (isNull historyBack)) || (not (isNull historyForward)) then
-            let (items, idx) = loadHistoryState()
-            historyItems <- items
-            historyIndex <- idx
-            updateHistoryButtons()
-            
-            if not (isNull historyBack) then
-                historyBack?addEventListener("click", fun (event: obj) ->
+let insertToken (token: string) =
+    let textarea = getElementById "text"
+    if not (isNull textarea) && not (String.IsNullOrWhiteSpace token) then
+        let start = unbox<int> textarea?selectionStart
+        let finish = unbox<int> textarea?selectionEnd
+        let currentValue = string textarea?value
+        let newValue = currentValue.Substring(0, start) + token + currentValue.Substring(finish)
+        textarea?value <- newValue
+        let caret = start + token.Length
+        textarea?setSelectionRange(caret, caret)
+        textarea?focus()
+
+let initTokenButtons () =
+    let buttons = querySelectorAll "[data-token]"
+    if not (isNull buttons) then
+        let length = unbox<int> buttons?length
+        for i = 0 to length - 1 do
+            let button = buttons?item(i)
+            if not (isNull button) then
+                button?addEventListener("click", fun (event: obj) ->
                     event?preventDefault()
-                    if historyIndex > 0 then
-                        historyIndex <- historyIndex - 1
-                        persistHistoryIndex()
-                        applyHistory()
-                        updateHistoryButtons())
-            
-            if not (isNull historyForward) then
-                historyForward?addEventListener("click", fun (event: obj) ->
-                    event?preventDefault()
-                    if historyIndex < historyItems.Length - 1 then
-                        historyIndex <- historyIndex + 1
-                        persistHistoryIndex()
-                        applyHistory()
-                        updateHistoryButtons())
+                    let token = string button?dataset?token
+                    insertToken token)
 
-    // ===== Keyboard Shortcuts & Status Line =====
-    let initKeyboardShortcuts () =
-        let textarea = document.getElementById "text"
-        let form = if isNull textarea then null else textarea?closest("form")
-        
-        if not (isNull textarea) then
-            textarea?addEventListener("keydown", fun (event: obj) ->
-                let ctrlKey = unbox<bool> (event?ctrlKey)
-                let metaKey = unbox<bool> (event?metaKey)
-                let key = unbox<string> (event?key)
-                
-                if (ctrlKey || metaKey) && key = "Enter" then
-                    event?preventDefault()
-                    let sendBtn = document.getElementById "send-text"
-                    if not (isNull sendBtn) then
-                        let disabled = unbox<bool> (sendBtn?disabled)
-                        if not disabled then
-                            form?submit())
+let updateHistoryButtons () =
+    let historyBack = getElementById "history-prev"
+    let historyForward = getElementById "history-next"
+    if not (isNull historyBack) then
+        historyBack?disabled <- historyIndex <= 0
+    if not (isNull historyForward) then
+        historyForward?disabled <- historyIndex >= historyItems.Length - 1
 
-    let initFormSubmitHandler () =
-        let textarea = document.getElementById "text"
-        let form = if isNull textarea then null else textarea?closest("form")
-        let statusLine = document.getElementById "status-line"
-        
-        if not (isNull form) then
-            form?addEventListener("submit", fun (_: obj) ->
-                // Update status line
-                if not (isNull statusLine) then
-                    statusLine?textContent <- "Sending..."
-                    statusLine?classList.add("sending")
-                    statusLine?classList.remove("sent")
-                
-                // Add history entry
-                let privateSendCheckbox = document.getElementById "private-send"
-                let isPrivateSend = if isNull privateSendCheckbox then false else unbox<bool> (privateSendCheckbox?``checked``)
-                
-                if not isPrivateSend then
-                    let text = unbox<string> (textarea?value)
-                    let items = addEntry text
-                    historyItems <- items
-                    historyIndex <- items.Length - 1
-                    updateHistoryButtons()
-                
-                // Simulate sent state after short delay
-                globalThis.setTimeout((fun () ->
-                    if not (isNull statusLine) then
-                        statusLine?textContent <- "Sent ✓"
-                        statusLine?classList.remove("sending")
-                        statusLine?classList.add("sent")
-                        
-                        globalThis.setTimeout((fun () ->
-                            statusLine?textContent <- "Ready"
-                            statusLine?classList.remove("sent")), 3000.0) |> ignore), 200.0) |> ignore)
+let applyHistory () =
+    let textarea = getElementById "text"
+    if not (isNull textarea) && historyIndex >= 0 && historyIndex < historyItems.Length then
+        let item = historyItems.[historyIndex]
+        let value = item.text
+        textarea?value <- value
+        let caret = value.Length
+        textarea?setSelectionRange(caret, caret)
+        textarea?focus()
 
-    // ===== History Toggle =====
-    let initHistoryToggle () =
-        let historyToggle = document.getElementById "history-toggle"
-        let historyList = document.getElementById "history-list"
-        
-        if not (isNull historyToggle) && not (isNull historyList) then
-            historyToggle?addEventListener("click", fun (event: obj) ->
-                event?preventDefault()
-                historyList?classList.toggle("hidden"))
-
-    // ===== Main Initialization =====
-    let init () =
-        initCopyButton()
-        initStatusRefresh()
-        initAutoRetry()
-        setupWebSocketConnection()
-        initTokenButtons()
-        initHistoryNavigation()
-        initKeyboardShortcuts()
-        initFormSubmitHandler()
-        initHistoryToggle()
-        // Initial status load
-        refreshStatus()
-
-    let start () =
-        if document.readyState = "loading" then
-            document.addEventListener("DOMContentLoaded", fun _ -> init())
+let rec renderHistoryList () =
+    let historyList: obj = getElementById "history-list"
+    if not (isNull historyList) then
+        historyList?innerHTML <- ""
+        if historyItems.IsEmpty then
+            let empty = createElement "div"
+            empty?className <- "history-empty"
+            empty?textContent <- "No history yet."
+            historyList?appendChild(empty) |> ignore
         else
-            init()
+            historyItems
+            |> List.iteri (fun index item ->
+                let button: obj = createElement "button"
+                button?``type`` <- "button"
+                button?className <- "history-item"
+                if index = historyIndex then
+                    let classList: obj = button?classList
+                    classList?add("active") |> ignore
+                button?textContent <- formatHistoryPreview item
+                let onClick (event: obj) =
+                    event?preventDefault()
+                    historyIndex <- index
+                    writeHistoryIndex historyIndex
+                    applyHistory()
+                    updateHistoryButtons()
+                    renderHistoryList()
+                    let historyClassList: obj = historyList?classList
+                    historyClassList?add("hidden") |> ignore
+                button?addEventListener("click", onClick)
+                historyList?appendChild(button) |> ignore)
 
-let () = Sender.start()
+let refreshHistoryState () =
+    let state = loadHistoryState()
+    historyItems <- state.items
+    historyIndex <- state.index
+    updateHistoryButtons()
+    renderHistoryList()
+
+let initHistoryNavigation () =
+    let historyBack = getElementById "history-prev"
+    let historyForward = getElementById "history-next"
+    if (not (isNull historyBack)) || (not (isNull historyForward)) then
+        refreshHistoryState()
+        if not (isNull historyBack) then
+            historyBack?addEventListener("click", fun (event: obj) ->
+                event?preventDefault()
+                if not historyItems.IsEmpty then
+                    historyIndex <- movePrev historyIndex historyItems
+                    writeHistoryIndex historyIndex
+                    applyHistory()
+                    updateHistoryButtons()
+                    renderHistoryList())
+        if not (isNull historyForward) then
+            historyForward?addEventListener("click", fun (event: obj) ->
+                event?preventDefault()
+                if not historyItems.IsEmpty then
+                    historyIndex <- moveNext historyIndex historyItems
+                    writeHistoryIndex historyIndex
+                    applyHistory()
+                    updateHistoryButtons()
+                    renderHistoryList())
+
+let initHistoryToggle () =
+    let historyToggle: obj = getElementById "history-toggle"
+    let historyList: obj = getElementById "history-list"
+    if not (isNull historyToggle) && not (isNull historyList) then
+        historyToggle?addEventListener("click", fun (event: obj) ->
+            event?preventDefault()
+            renderHistoryList()
+            let classList: obj = historyList?classList
+            classList?toggle("hidden") |> ignore)
+
+let initKeyboardShortcuts () =
+    let textarea = getElementById "text"
+    let form = if isNull textarea then null else textarea?closest("form")
+    if not (isNull textarea) then
+        textarea?addEventListener("keydown", fun (event: obj) ->
+            let ctrlKey = unbox<bool> event?ctrlKey
+            let metaKey = unbox<bool> event?metaKey
+            let key = string event?key
+            if (ctrlKey || metaKey) && key = "Enter" then
+                event?preventDefault()
+                let sendBtn = getElementById "send-text"
+                if not (isNull sendBtn) && not (unbox<bool> sendBtn?disabled) then
+                    form?submit())
+
+let initFormSubmitHandler () =
+    let textarea = getElementById "text"
+    let form = if isNull textarea then null else textarea?closest("form")
+    let statusLine: obj = getElementById "status-line"
+    if not (isNull form) then
+        form?addEventListener("submit", fun (_: obj) ->
+            if not (isNull statusLine) then
+                statusLine?textContent <- "Sending..."
+                let statusClassList: obj = statusLine?classList
+                statusClassList?add("sending") |> ignore
+                statusClassList?remove("sent") |> ignore
+            let privateSendCheckbox = getElementById "private-send"
+            let isPrivateSend = if isNull privateSendCheckbox then false else unbox<bool> privateSendCheckbox?``checked``
+            if not isPrivateSend then
+                let text = string textarea?value
+                let state = addHistoryEntry text
+                historyItems <- state.items
+                historyIndex <- state.index
+                updateHistoryButtons()
+                renderHistoryList()
+            globalThis?setTimeout((fun () ->
+                if not (isNull statusLine) then
+                    statusLine?textContent <- "Sent ✓"
+                    let statusClassList: obj = statusLine?classList
+                    statusClassList?remove("sending") |> ignore
+                    statusClassList?add("sent") |> ignore
+                    globalThis?setTimeout((fun () ->
+                        statusLine?textContent <- "Ready"
+                        let statusClassList: obj = statusLine?classList
+                        statusClassList?remove("sent") |> ignore), 3000) |> ignore), 200) |> ignore)
+
+let init () =
+    initCopyButton()
+    initStatusRefresh()
+    initAutoRetry()
+    setupWebSocketConnection()
+    initTokenButtons()
+    initHistoryNavigation()
+    initHistoryToggle()
+    initKeyboardShortcuts()
+    initFormSubmitHandler()
+    refreshStatus()
+
+let start () =
+    let state = string document?readyState
+    if state = "loading" then
+        document?addEventListener("DOMContentLoaded", fun _ -> init())
+    else
+        init()
+
+let () = start()

@@ -1,134 +1,184 @@
-import { class_type } from "../fable_modules/fable-library-js.4.28.0/Reflection.js";
-import { append, item } from "../fable_modules/fable-library-js.4.28.0/Array.js";
+import { printf, toText, substring, isNullOrWhiteSpace } from "../fable_modules/fable-library-js.4.28.0/String.js";
+import { toString } from "../fable_modules/fable-library-js.4.28.0/Types.js";
+import { length, isEmpty, map, toArray, ofArray, choose, empty } from "../fable_modules/fable-library-js.4.28.0/List.js";
+import { addEntry, normalizeText, HistoryState, clampIndex, HistoryItem } from "./HistoryCore.js";
+import { equals, int32ToString, defaultOf } from "../fable_modules/fable-library-js.4.28.0/Util.js";
+import { parse } from "../fable_modules/fable-library-js.4.28.0/Int32.js";
 
-export class JSON$ {
-    constructor() {
+function StorageOps_tryGetItem(key) {
+    if (isNullOrWhiteSpace(key)) {
+        return undefined;
     }
-}
-
-export function JSON$_$reflection() {
-    return class_type("SenderApp.Client.JSON", undefined, JSON$);
-}
-
-export function JSON_parse_Z721C83C5(json) {
-    throw 1;
-}
-
-export function JSON_stringify_1505(obj) {
-    throw 1;
-}
-
-export class LocalStorage {
-    constructor() {
-    }
-}
-
-export function LocalStorage_$reflection() {
-    return class_type("SenderApp.Client.LocalStorage", undefined, LocalStorage);
-}
-
-export function LocalStorage__getItem_Z721C83C5(this$, key) {
-    throw 1;
-}
-
-export function LocalStorage__setItem_Z384F8060(this$, key, value) {
-    throw 1;
-}
-
-export const History_historyKey = "linuxkey-history";
-
-export const History_historyIndexKey = "linuxkey-history-index";
-
-export function History_loadHistoryState() {
-    try {
-        let json;
-        throw 1;
-        let matchResult, json_1;
-        if (json != null) {
-            if (json === "") {
-                matchResult = 0;
-            }
-            else {
-                matchResult = 1;
-                json_1 = json;
-            }
-        }
-        else {
-            matchResult = 0;
-        }
-        switch (matchResult) {
-            case 0:
-                return [];
-            default:
-                return JSON_parse_Z721C83C5(json_1);
-        }
-    }
-    catch (matchValue) {
-        return [];
-    }
-}
-
-export function History_getIndex() {
-    try {
-        let json;
-        throw 1;
-        let matchResult, json_1;
-        if (json != null) {
-            if (json === "") {
-                matchResult = 0;
-            }
-            else {
-                matchResult = 1;
-                json_1 = json;
-            }
-        }
-        else {
-            matchResult = 0;
-        }
-        switch (matchResult) {
-            case 0:
-                return 0;
-            default:
-                return JSON_parse_Z721C83C5(json_1) | 0;
-        }
-    }
-    catch (matchValue) {
-        return 0;
-    }
-}
-
-export function History_saveItems(items) {
-    throw 1;
-}
-
-export function History_saveIndex(index) {
-    throw 1;
-}
-
-export function History_addEntry(text) {
-    const items = History_loadHistoryState();
-    let newItems;
-    if (items.length > 0) {
-        const lastItem = item(items.length - 1, items);
+    else {
         try {
-            newItems = (((() => {
-                throw 1;
-            })() === text) ? items : append(items, [(() => {
-                throw 1;
-            })()]));
+            const value = (window.localStorage).getItem(key);
+            return (value == null) ? undefined : toString(value);
         }
         catch (matchValue) {
-            newItems = append(items, [(() => {
-                throw 1;
-            })()]);
+            return undefined;
+        }
+    }
+}
+
+function StorageOps_trySetItem(key, value) {
+    if (isNullOrWhiteSpace(key)) {
+    }
+    else {
+        try {
+            (window.localStorage).setItem(key, value);
+        }
+        catch (matchValue) {
+        }
+    }
+}
+
+export const historyKey = "linuxkey-history";
+
+export const historyIndexKey = "linuxkey-history-index";
+
+function parseItems(raw) {
+    if (raw != null) {
+        const json = raw;
+        try {
+            return choose((item) => {
+                if (item == null) {
+                    return undefined;
+                }
+                else if ((typeof item) === "string") {
+                    return new HistoryItem(toString(item), Date.now());
+                }
+                else {
+                    const textObj = item.text;
+                    if (textObj == null) {
+                        return undefined;
+                    }
+                    else {
+                        const text = toString(textObj);
+                        const tsObj = item.timestamp;
+                        return new HistoryItem(text, (tsObj == null) ? undefined : (() => {
+                            try {
+                                return tsObj;
+                            }
+                            catch (matchValue) {
+                                return undefined;
+                            }
+                        })());
+                    }
+                }
+            }, ofArray(JSON.parse(json)));
+        }
+        catch (matchValue_1) {
+            return empty();
         }
     }
     else {
-        newItems = [(() => {
-            throw 1;
-        })()];
+        return empty();
     }
-    History_saveItems(newItems);
-    return newItems;
+}
+
+function toJsItem(item) {
+    let matchValue;
+    return {
+        text: item.text,
+        timestamp: (matchValue = item.timestamp, (matchValue != null) ? matchValue : defaultOf()),
+    };
+}
+
+export function readHistory() {
+    return parseItems(StorageOps_tryGetItem(historyKey));
+}
+
+export function writeHistory(items) {
+    const jsItems = toArray(map(toJsItem, items));
+    try {
+        StorageOps_trySetItem(historyKey, JSON.stringify(jsItems));
+    }
+    catch (matchValue) {
+    }
+}
+
+export function readHistoryIndex(maxIndex) {
+    if (maxIndex < 0) {
+        return 0;
+    }
+    else {
+        const matchValue = StorageOps_tryGetItem(historyIndexKey);
+        let matchResult, raw;
+        if (matchValue != null) {
+            if (matchValue === "") {
+                matchResult = 0;
+            }
+            else {
+                matchResult = 1;
+                raw = matchValue;
+            }
+        }
+        else {
+            matchResult = 0;
+        }
+        switch (matchResult) {
+            case 0:
+                return maxIndex | 0;
+            default:
+                try {
+                    return clampIndex(parse(raw, 511, false, 32), maxIndex) | 0;
+                }
+                catch (matchValue_1) {
+                    return clampIndex(0, maxIndex) | 0;
+                }
+        }
+    }
+}
+
+export function writeHistoryIndex(index) {
+    StorageOps_trySetItem(historyIndexKey, int32ToString(index));
+}
+
+export function loadHistoryState() {
+    const items = readHistory();
+    if (isEmpty(items)) {
+        return new HistoryState(empty(), 0);
+    }
+    else {
+        return new HistoryState(items, readHistoryIndex(length(items) - 1));
+    }
+}
+
+export function addHistoryEntry(text) {
+    const matchValue = normalizeText(text);
+    if (matchValue != null) {
+        const trimmed = matchValue;
+        const items = readHistory();
+        const state = addEntry(() => Date.now(), items, trimmed);
+        if (!equals(state.items, items)) {
+            writeHistory(state.items);
+        }
+        writeHistoryIndex(state.index);
+        return state;
+    }
+    else {
+        return loadHistoryState();
+    }
+}
+
+export function formatHistoryPreview(item) {
+    const preview = (item.text.length > 30) ? (substring(item.text, 0, 30) + "…") : item.text;
+    const matchValue = item.timestamp;
+    if (matchValue != null) {
+        const ts = matchValue;
+        try {
+            const date = new Date(ts);
+            const hours = (date.getHours()) | 0;
+            const minutes = (date.getMinutes()) | 0;
+            const seconds = (date.getSeconds()) | 0;
+            return toText(printf("%02d:%02d:%02d | %s"))(hours)(minutes)(seconds)(preview);
+        }
+        catch (matchValue_1) {
+            return preview;
+        }
+    }
+    else {
+        return preview;
+    }
 }
 

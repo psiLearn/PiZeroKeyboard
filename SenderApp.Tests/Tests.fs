@@ -537,8 +537,7 @@ module Tests =
             let! body = response.Content.ReadAsStringAsync()
             Assert.Contains("id=\"history-prev\"", body)
             Assert.Contains("id=\"history-next\"", body)
-            Assert.Contains("src=\"/history.js\"", body)
-            Assert.Contains("src=\"/sender.js\"", body)
+            Assert.Contains("src=\"/src/Sender.js\"", body)
         }
 
     [<Fact>]

@@ -51,19 +51,17 @@ Status: Fast-forward merge successful
 - Handlers optimized (+107 lines)
 - Startup improved (+10 lines)
 
-### Phase 5: Fable Migration Framework
-✅ **History.fs created** (250 lines)
-- Type-safe F# version of history.js
-- All 8 functions migrated
-- Comprehensive error handling
-- Format migration support
-- JavaScript interop configured
+### Phase 5: Fable Migration
+✅ **History + Sender migrated**
+- History.fs + HistoryCore.fs provide type-safe history logic
+- Sender.fs implements UI behavior and WebSocket status updates
+- JavaScript interop configured and aligned with Views
 
-✅ **Fable framework ready**
-- Pre-build target configured
+✅ **Fable toolchain active**
+- `dotnet-tools.json` uses `dotnet fable`
 - Client project structure created
-- npm scripts prepared
-- Graceful fallback in place
+- npm scripts compile to `wwwroot/src`
+- Pre-build target configured with graceful fallback
 
 ✅ **Documentation complete** (14 files, 5,500+ lines)
 - CHANGES_REVIEW.md
@@ -125,18 +123,18 @@ SenderApp/
 │   └─ SendingControlsService.fs (NEW)
 ├── Client/ (Fable)
 │   ├── src/
-│   │   ├── History.fs (NEW - 250 lines)
-│   │   └── Sender.fs (NEW - stubs)
+│   │   ├── History.fs
+│   │   ├── HistoryCore.fs
+│   │   └── Sender.fs
 │   ├── Client.fsproj (NEW)
 │   ├── fable.json (NEW)
 │   └── package.json (NEW)
 ├── wwwroot/
-│   ├── sender.js (enhanced, 305 lines)
-│   ├── history.js (enhanced, 132 lines)
 │   ├── sender.css (enhanced, 432 lines)
 │   └── src/
-│       ├── History.js (generated placeholder)
-│       └── Sender.js (generated placeholder)
+│       ├── History.js
+│       ├── HistoryCore.js
+│       └── Sender.js
 └── SenderApp.fsproj (updated with Fable pre-build)
 
 ReceiverApp/
@@ -180,7 +178,7 @@ Documentation/
 4. Hardware testing
 
 ### Medium-term (Future Sprints)
-1. Plan Phase 2 (sender.js migration)
+1. Plan next Fable iteration (UI tests, cleanup)
 2. Consider other migrations
 3. Performance optimization
 4. Advanced features

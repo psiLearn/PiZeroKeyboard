@@ -6,7 +6,8 @@ This guide explains how to enable Fable compilation for the SenderApp client cod
 
 - **Fable Project Structure**: ✅ Configured in `SenderApp/Client/`
 - **Pre-build Integration**: ✅ Enabled in `SenderApp.fsproj`
-- **JavaScript Runtime**: ✅ Active (sender.js, history.js, sender.css)
+- **Tooling**: ✅ Local `dotnet fable` via `dotnet-tools.json`
+- **JavaScript Runtime**: ✅ Active (`wwwroot/src/*.js`, `sender.css`)
 
 ## To Enable Fable Compilation
 
@@ -18,38 +19,27 @@ This guide explains how to enable Fable compilation for the SenderApp client cod
    npm --version
    ```
 
-2. **Fable Compiler** (versions 2.x or 3.x are stable)
+2. **.NET SDK** (for the `dotnet fable` tool manifest)
 
 ### Setup Steps
 
-1. **Choose a Fable version** from available releases:
-   - Latest stable: [fable-compiler@2.13.0](https://www.npmjs.com/package/fable-compiler/v/2.13.0)
-   - Or use a newer version if available
-
-2. **Update `SenderApp/Client/package.json`**:
-   ```json
-   {
-     "devDependencies": {
-       "fable-compiler": "2.13.0"
-     },
-     "dependencies": {
-       "fable-core": "1.3.8"
-     }
-   }
+1. **Restore dotnet tools** (from repo root):
+   ```bash
+   dotnet tool restore
    ```
 
-3. **Install dependencies**:
+2. **Install dependencies**:
    ```bash
    cd SenderApp/Client
    npm install
    ```
 
-4. **Build the client**:
+3. **Build the client**:
    ```bash
    npm run build
    ```
 
-5. **Or build the entire project** (auto-builds client):
+4. **Or build the entire project** (auto-builds client):
    ```bash
    dotnet build SenderApp/SenderApp.fsproj
    ```
@@ -63,7 +53,8 @@ SenderApp/Client/
 ├── package.json               # npm configuration
 ├── src/
 │   ├── Sender.fs              # Main client application (F#)
-│   └── History.fs             # History management (F#)
+│   ├── History.fs             # History management (F#)
+│   └── HistoryCore.fs         # Core history logic (F#)
 └── node_modules/              # npm dependencies (generated)
 ```
 
@@ -71,21 +62,20 @@ SenderApp/Client/
 
 1. **Pre-build Hook**: `SenderApp.fsproj` has a `BuildFableClient` target that runs before `Build`
 2. **npm Installation**: Dependencies are installed via `npm install`
-3. **Fable Compilation**: `npm run build` compiles `src/*.fs` → `../wwwroot/*.js`
+3. **Fable Compilation**: `npm run build` compiles `src/*.fs` → `../wwwroot/src/*.js`
 4. **Static Files**: Compiled JS is included in the server's wwwroot
 
 ## Troubleshooting
 
 ### npm install fails
 
-**Problem**: Package not found (404 error)
-- **Solution**: Check npm package versions exist on registry
-- **Command**: `npm view fable-compiler versions`
+**Problem**: Registry errors or missing packages
+- **Solution**: Clear npm cache and retry: `npm cache clean --force`
 
 ### Fable compiler errors
 
 **Problem**: JSInterop or syntax issues
-- **Solution**: Verify Fable version compatibility with F# 5.0
+- **Solution**: Verify `dotnet fable` tool restore and run `dotnet fable --help`
 - **Reference**: [Fable Documentation](https://fable.io/)
 
 ### Skipping Fable build
@@ -96,25 +86,22 @@ If you want to skip the Fable build (use existing JavaScript):
 
 ## Current Implementation
 
-The project currently uses **hand-written JavaScript** for the client:
-- `SenderApp/wwwroot/sender.js` - 305 lines, all Phase 4 features
-- `SenderApp/wwwroot/history.js` - 132 lines, localStorage management
+The project now uses **Fable-generated JavaScript** for the client:
+- `SenderApp/wwwroot/src/Sender.js` - Fable output for UI behavior
+- `SenderApp/wwwroot/src/History.js` - Fable output for history storage
+- `SenderApp/wwwroot/src/HistoryCore.js` - Fable output for core history logic
 - `SenderApp/wwwroot/sender.css` - Full styling
-
-This JavaScript is production-ready and the build doesn't depend on Fable.
 
 ## Next Steps
 
 To fully enable Fable:
-1. Fix Fable F# source files (currently stubs in `src/`)
-2. Update npm dependencies to compatible versions
-3. Test Fable compilation output
-4. Compare Fable JS with current hand-written JS
-5. Migrate to Fable output if satisfied with size/performance
+1. Keep Fable sources and outputs in sync (run `npm run build`)
+2. Add browser-level tests if needed (Playwright)
+3. Monitor bundle size/performance
 
 ## See Also
 
 - [Fable Official Docs](https://fable.io/)
 - [JSInterop in Fable](https://fable.io/docs/javascript/interop.html)
-- [Current JavaScript Implementation](SenderApp/wwwroot/sender.js)
+- [Current JavaScript Implementation](SenderApp/wwwroot/src/Sender.js)
 - [Build Configuration](SenderApp/SenderApp.fsproj)

@@ -16,8 +16,7 @@ module Views =
             meta [ _name "viewport"; _content "width=device-width, initial-scale=1" ]
             link [ _rel "stylesheet"; _href "https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@48,400,0,0" ]
             link [ _rel "stylesheet"; _href "/sender.css" ]
-            script [ _src "/history.js"; attr "defer" "defer" ] []
-            script [ _src "/sender.js"; attr "defer" "defer" ] []
+            script [ _src "/src/Sender.js"; attr "type" "module" ] []
         ]
 
     let buildStatusNodes showDevInfo (settings: SenderSettings) status sendStartTime =
