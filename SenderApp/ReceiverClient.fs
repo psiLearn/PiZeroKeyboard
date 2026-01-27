@@ -13,13 +13,14 @@ module ReceiverClient =
                 use stream = client.GetStream()
                 let payload = Encoding.UTF8.GetBytes text
                 do! stream.WriteAsync(payload, 0, payload.Length)
+                let charCount = text.Length
                 logger.LogInformation(
-                    "Sent {ByteCount} bytes to {Ip}:{Port}",
-                    payload.Length,
+                    "Sent {CharCount} chars to {Ip}:{Port}",
+                    charCount,
                     settings.TargetIp,
                     settings.TargetPort
                 )
-                return Ok payload.Length
+                return Ok charCount
             with ex ->
                 logger.LogError(
                     ex,
@@ -37,7 +38,7 @@ module ReceiverClient =
             use stream = client.GetStream()
             let payload = Encoding.UTF8.GetBytes text
             stream.Write(payload, 0, payload.Length)
-            printfn "Sent %d bytes to %s:%d" payload.Length ip port
+            printfn "Sent %d chars to %s:%d" text.Length ip port
             0
         with ex ->
             eprintfn "Failed: %s" ex.Message

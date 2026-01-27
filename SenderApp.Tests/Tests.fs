@@ -441,7 +441,7 @@ module Tests =
         let nodes2 = buildStatusNodes false settings (Success 1) None
         let nodes3 = buildStatusNodes true settings (Success 1) None
         let nodes4 = buildStatusNodes true settings (Failure "oops") None
-        let nodes5 = buildStatusNodes true settings (Sending { BytesSent = 50; TotalBytes = 100 }) None
+        let nodes5 = buildStatusNodes true settings (Sending { CharactersSent = 50; TotalCharacters = 100 }) None
         
         Assert.Empty(nodes1)
         Assert.Equal(1, nodes2.Length)
@@ -467,7 +467,7 @@ module Tests =
               SendStartTime = None }
         let withTarget = renderHeader settings model true
         let withoutTarget = renderHeader settings model false
-        Assert.Equal(3, withTarget.Length)
+        Assert.Equal(2, withTarget.Length)
         Assert.Equal(2, withoutTarget.Length)
 
     [<Fact>]

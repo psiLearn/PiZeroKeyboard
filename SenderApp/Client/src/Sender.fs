@@ -37,7 +37,6 @@ let setDot (element: obj) (baseClass: string) (text: string) (cssClass: string) 
     if not (isNull element) then
         let cls = if String.IsNullOrWhiteSpace cssClass then baseClass else sprintf "%s %s" baseClass cssClass
         element?className <- cls
-        element?setAttribute("title", text)
         element?setAttribute("aria-label", text)
 
 let tryGetString (data: obj) (prop: string) (fallback: string) =
@@ -92,25 +91,6 @@ let startRetryCountdown (seconds: int) =
             | None -> ()
             retryCountdownTimer <- None), 1000)
     retryCountdownTimer <- Some timer
-
-let initCopyButton () =
-    let btn = getElementById "copy-target"
-    if not (isNull btn) then
-        btn?addEventListener("click", fun (event: obj) ->
-            event?preventDefault()
-            let display = getElementById "target-display"
-            if not (isNull display) then
-                let text = string display?textContent
-                let clipboard = globalThis?navigator?clipboard
-                if not (isNull clipboard) then
-                    let promise = clipboard?writeText(text)
-                    promise
-                        ?``then``(fun _ ->
-                            let originalText = btn?textContent
-                            btn?textContent <- "✓"
-                            globalThis?setTimeout((fun () -> btn?textContent <- originalText), 1500) |> ignore)
-                        ?``catch``(fun err -> JS.console.error("Failed to copy:", err))
-                    |> ignore)
 
 let initStatusRefresh () =
     let refreshBtn = getElementById "refresh-status"
@@ -335,7 +315,6 @@ let initFormSubmitHandler () =
                         statusClassList?remove("sent") |> ignore), 3000) |> ignore), 200) |> ignore)
 
 let init () =
-    initCopyButton()
     initStatusRefresh()
     initAutoRetry()
     setupWebSocketConnection()

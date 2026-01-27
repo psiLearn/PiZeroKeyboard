@@ -22,7 +22,6 @@ export function setDot(element, baseClass, text, cssClass) {
     if (!(element == null)) {
         const cls = isNullOrWhiteSpace(cssClass) ? baseClass : toText(printf("%s %s"))(baseClass)(cssClass);
         element.className = cls;
-        element.setAttribute("title", text);
         element.setAttribute("aria-label", text);
     }
 }
@@ -101,32 +100,6 @@ export function startRetryCountdown(seconds) {
         }
     }), 1000);
     retryCountdownTimer(some(timer));
-}
-
-export function initCopyButton() {
-    const btn = document.getElementById("copy-target");
-    if (!(btn == null)) {
-        btn.addEventListener("click", ((event) => {
-            event.preventDefault();
-            const display = document.getElementById("target-display");
-            if (!(display == null)) {
-                const text = toString(display.textContent);
-                const clipboard = (globalThis).navigator.clipboard;
-                if (!(clipboard == null)) {
-                    const promise = clipboard.writeText(text);
-                    (promise.then((_arg) => {
-                        const originalText = btn.textContent;
-                        btn.textContent = "✓";
-                        (globalThis).setTimeout((() => {
-                            btn.textContent = originalText;
-                        }), 1500);
-                    })).catch((err) => {
-                        console.error(some("Failed to copy:"), ...err);
-                    });
-                }
-            }
-        }));
-    }
 }
 
 export function initStatusRefresh() {
@@ -425,7 +398,6 @@ export function initFormSubmitHandler() {
 }
 
 export function init() {
-    initCopyButton();
     initStatusRefresh();
     initAutoRetry();
     setupWebSocketConnection();

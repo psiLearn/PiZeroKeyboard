@@ -74,7 +74,8 @@ button.secondary:hover:not(:disabled) { background: #334155; }
 .layout-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; }
 .layout-row label { font-weight: 600; }
 .layout-row select { padding: 0.4rem 0.6rem; border-radius: 0.4rem; border: 1px solid var(--border); background: var(--panel); }
-.status-panel { position: fixed; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.45rem; background: rgba(255, 255, 255, 0.9); padding: 0.35rem 0.6rem; border-radius: 999px; border: 1px solid var(--border); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08); z-index: 10; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.status-panel { position: fixed; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.45rem; background: rgba(255, 255, 255, 0.9); padding: 0.35rem 0.6rem; border-radius: 999px; border: 1px solid var(--border); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08); z-index: 10; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); cursor: help; }
+.status-panel[data-tooltip]:hover::after { content: attr(data-tooltip); position: absolute; top: calc(100% + 0.5rem); right: 0; background: #0f172a; color: white; padding: 0.5rem 0.75rem; border-radius: 0.4rem; font-size: 0.75rem; white-space: pre-line; max-width: 18rem; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25); }
 .status-panel button { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
 .usb-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--unknown); box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.2); }
 .usb-dot.connected { background: var(--success); box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2); }
@@ -127,8 +128,13 @@ button.secondary:hover:not(:disabled) { background: #334155; }
 #history-toggle { margin-left: auto; }
 .history-dropdown { margin-top: 0.75rem; max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 0.4rem; background: var(--panel); }
 .history-dropdown.hidden { display: none; }
+.settings-panel { margin: 1.5rem 0; border: 1px solid var(--border); border-radius: 0.5rem; background: rgba(255, 255, 255, 0.5); }
+.settings-summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 0.85rem 1rem; list-style: none; display: flex; align-items: center; gap: 0.5rem; }
+.settings-summary::-webkit-details-marker { display: none; }
+.settings-panel[open] .settings-summary { border-bottom: 1px solid var(--border); }
+.settings-panel .sending-controls { margin: 0; border: none; background: transparent; padding: 1rem; }
 .sending-controls { display: flex; flex-direction: column; gap: 1.5rem; margin: 1.5rem 0; padding: 1rem; background: rgba(255, 255, 255, 0.5); border-radius: 0.5rem; border: 1px solid var(--border); }
-.section-header { font-size: 0.9rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; margin: 0.5rem 0 0 0; }
+.section-header { font-size: 0.9rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; margin: 0.5rem 0 0 0; display: flex; align-items: center; gap: 0.4rem; }
 .section-divider { height: 1px; background: var(--border); margin: 0.75rem 0; }
 .control-section { display: flex; flex-direction: column; gap: 0.5rem; }
 .control-section label { font-weight: 600; font-size: 0.95rem; }
@@ -143,6 +149,11 @@ button.secondary:hover:not(:disabled) { background: #334155; }
 .checkbox-group { display: flex; flex-direction: column; gap: 0.75rem; }
 .checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 400; }
 .checkbox-label input { cursor: pointer; }
+.keyboard-panel { margin: 1.5rem 0; border: 1px solid var(--border); border-radius: 0.5rem; background: rgba(255, 255, 255, 0.5); }
+.keyboard-summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 0.85rem 1rem; list-style: none; display: flex; align-items: center; gap: 0.5rem; }
+.keyboard-summary::-webkit-details-marker { display: none; }
+.keyboard-panel[open] .keyboard-summary { border-bottom: 1px solid var(--border); }
+.keyboard-panel .keyboard-section { margin: 0; padding: 1rem; }
 .keyboard-section { margin: 1.5rem 0; }
 .keyboard-visible { max-height: 1000px; opacity: 1; transition: all 0.3s ease; }
 .keyboard-hidden { max-height: 0; opacity: 0; overflow: hidden; transition: all 0.3s ease; }
@@ -172,21 +183,6 @@ body.mobile .send-row .history-btn { width: 100%; }
   .preset-buttons { gap: 0.4rem; }
   .preset-buttons .preset { flex: 1; }
 }
-
-/* Connection banner and copy button */
-.connection-banner { padding: 1rem; margin-bottom: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.7); }
-.connection-banner.connected { border-color: #86efac; background: rgba(220, 252, 231, 0.3); }
-.connection-banner.disconnected { border-color: #fca5a5; background: rgba(254, 226, 226, 0.3); }
-.connection-content { display: flex; flex-direction: column; gap: 0.75rem; }
-.connection-text { font-weight: 600; font-size: 1rem; }
-.connection-target { display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
-.copy-btn { padding: 0.25rem 0.5rem; background: transparent; border: 1px solid var(--border); border-radius: 0.3rem; cursor: pointer; font-size: 0.9rem; transition: all 0.2s ease; }
-.copy-btn:hover { background: var(--border); }
-.connection-details { margin-top: 0.5rem; }
-.connection-details-summary { cursor: pointer; font-size: 0.9rem; color: var(--accent); font-weight: 500; padding: 0.4rem 0; -webkit-user-select: none; user-select: none; }
-.connection-details-summary:hover { color: var(--accent-dark); }
-.connection-details-content { margin-top: 0.5rem; padding: 0.75rem 0.5rem; background: rgba(100, 116, 139, 0.03); border-left: 3px solid var(--border); border-radius: 0.3rem; }
-.connection-suggestion { font-size: 0.9rem; line-height: 1.5; color: var(--text); }
 
 /* Tooltip styling */
 [title] { position: relative; }

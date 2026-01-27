@@ -67,9 +67,9 @@ module Handlers =
         let model = buildModelWithConnection ctx settings isMobile layout (Failure "Please enter some text before sending.")
         renderPage settings model showDevInfo next ctx
 
-    let private handleSuccessfulSend ctx settings isMobile layout showDevInfo bytes sendStartTime next =
+    let private handleSuccessfulSend ctx settings isMobile layout showDevInfo charCount sendStartTime next =
         let model = 
-            { buildModelWithConnection ctx settings isMobile layout (Success bytes) with
+            { buildModelWithConnection ctx settings isMobile layout (Success charCount) with
                 Text = ""
                 SendStartTime = Some sendStartTime }
         renderPage settings model showDevInfo next ctx
@@ -99,9 +99,10 @@ module Handlers =
                     let logger = ctx.GetLogger()
                     let sendStartTime = DateTime.UtcNow
                     let payload = preparePayload sendLayoutToken layout text
+                    let userCharCount = text.Length
                     let! result = sendToReceiver logger settings payload
 
                     match result with
-                    | Ok bytes -> return! handleSuccessfulSend ctx settings isMobile layout showDevInfo bytes sendStartTime next
+                    | Ok _ -> return! handleSuccessfulSend ctx settings isMobile layout showDevInfo userCharCount sendStartTime next
                     | Error message -> return! handleFailedSend ctx settings isMobile layout showDevInfo message text next
             }

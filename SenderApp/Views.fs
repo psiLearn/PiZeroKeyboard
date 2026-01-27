@@ -30,37 +30,37 @@ module Views =
         match status with
         | Idle -> []
         | Sending progress ->
-            let percentage = if progress.TotalBytes > 0 then (progress.BytesSent * 100) / progress.TotalBytes else 0
-            let remaining = progress.TotalBytes - progress.BytesSent
+            let percentage = if progress.TotalCharacters > 0 then (progress.CharactersSent * 100) / progress.TotalCharacters else 0
+            let remaining = progress.TotalCharacters - progress.CharactersSent
             [ div [ _class "alert info" ] [
                 div [ _class "status-header" ] [
                     str "Sending… "
                     span [ _class "progress-percentage" ] [ str (sprintf "%d%%" percentage) ]
-                    span [ _class "progress-detail" ] [ str (sprintf " (%d/%d bytes)" progress.BytesSent progress.TotalBytes) ]
+                    span [ _class "progress-detail" ] [ str (sprintf " (%d/%d chars)" progress.CharactersSent progress.TotalCharacters) ]
                 ]
                 div [ _class "progress-bar" ] [
                     div [ _class "progress-fill"; _style (sprintf "width: %d%%" percentage) ] []
                 ]
                 if remaining > 0 then
                     div [ _class "status-info" ] [
-                        str (sprintf "Sending remaining %d bytes…" remaining)
+                        str (sprintf "Sending remaining %d chars…" remaining)
                     ]
                 div [ _class "status-actions" ] [
                     button [ _type "button"; _id "abort-send"; _class "secondary"; _title "Abort current send operation" ] [ str "✕ Abort" ]
                 ]
             ] ]
-        | Success bytes ->
+        | Success charCount ->
             let duration = calculateSendDuration ()
             let durationStr = if duration > 0 then sprintf " in %d ms" duration else ""
             if showDevInfo then
                 [ div [ _class "alert success" ] [
                     span [ _class "success-icon" ] [ str "✓" ]
-                    str (sprintf " Sent %d bytes to %s:%d%s" bytes settings.TargetIp settings.TargetPort durationStr)
+                    str (sprintf " Sent %d chars to %s:%d%s" charCount settings.TargetIp settings.TargetPort durationStr)
                 ] ]
             else
                 [ div [ _class "alert success" ] [
                     span [ _class "success-icon" ] [ str "✓" ]
-                    str (sprintf " Text sent successfully! (%d bytes%s)" bytes durationStr)
+                    str (sprintf " Text sent successfully! (%d chars%s)" charCount durationStr)
                 ] ]
         | Failure message ->
             [ div [ _class "alert error" ] [
@@ -90,100 +90,117 @@ module Views =
               ] ]
 
     let renderSendingControls (controls: SendingControls) =
-        div [ _class "sending-controls" ] [
-            div [ _class "section-header" ] [ str "⏱️ Timing" ]
-            div [ _class "control-section" ] [
-                label [ _for "typing-delay" ] [ 
-                    str "Typing delay (ms per character): "
-                    span [ _class "control-hint" ] [ str "(0 for instant)" ]
-                ]
-                div [ _class "control-row" ] [
-                    input [ 
-                        _type "range"
-                        _id "typing-delay"
-                        _name "typing-delay"
-                        _min "0"
-                        _max "1000"
-                        _value (string controls.TypingDelayMs)
-                        _class "control-slider"
-                    ]
-                    input [
-                        _type "number"
-                        _id "typing-delay-input"
-                        _min "0"
-                        _max "1000"
-                        _value (string controls.TypingDelayMs)
-                        _class "control-number-input"
-                    ]
-                    span [ _id "typing-delay-value"; _class "control-value" ] [ str "ms" ]
-                ]
-                div [ _class "preset-buttons" ] [
-                    button [ _type "button"; _class "preset"; attr "data-preset-delay" "0" ] [ str "Instant" ]
-                    button [ _type "button"; _class "preset"; attr "data-preset-delay" "2" ] [ str "2ms" ]
-                    button [ _type "button"; _class "preset"; attr "data-preset-delay" "5" ] [ str "5ms" ]
-                    button [ _type "button"; _class "preset"; attr "data-preset-delay" "10" ] [ str "10ms" ]
-                ]
+        details [ _class "settings-panel" ] [
+            summary [ _class "settings-summary" ] [
+                span [ _class "material-symbols-rounded sm" ] [ str "settings" ]
+                str "Settings"
             ]
-            
-            div [ _class "section-header" ] [ str "📦 Reliability" ]
-            div [ _class "control-section" ] [
-                label [ _for "chunk-size" ] [
-                    str "Chunk size (bytes): "
-                    span [ _class "control-hint"; _title "Text is sent in chunks of this many bytes. Smaller chunks help with apps that drop input under load." ] [ str "(for apps that drop keys under load)" ]
+            div [ _class "sending-controls" ] [
+                div [ _class "section-header" ] [
+                    span [ _class "material-symbols-rounded sm" ] [ str "timer" ]
+                    str "Timing"
                 ]
-                div [ _class "control-row" ] [
-                    input [
-                        _type "range"
-                        _id "chunk-size"
-                        _name "chunk-size"
-                        _min "1"
-                        _max "10000"
-                        _value (string controls.ChunkSize)
-                        _class "control-slider"
+                div [ _class "control-section" ] [
+                    label [ _for "typing-delay" ] [ 
+                        str "Typing delay (ms per character): "
+                        span [ _class "control-hint" ] [ str "(0 for instant)" ]
                     ]
-                    input [
-                        _type "number"
-                        _id "chunk-size-input"
-                        _min "1"
-                        _max "10000"
-                        _value (string controls.ChunkSize)
-                        _class "control-number-input"
+                    div [ _class "control-row" ] [
+                        input [ 
+                            _type "range"
+                            _id "typing-delay"
+                            _name "typing-delay"
+                            _min "0"
+                            _max "1000"
+                            _value (string controls.TypingDelayMs)
+                            _class "control-slider"
+                        ]
+                        input [
+                            _type "number"
+                            _id "typing-delay-input"
+                            _min "0"
+                            _max "1000"
+                            _value (string controls.TypingDelayMs)
+                            _class "control-number-input"
+                        ]
+                        span [ _id "typing-delay-value"; _class "control-value" ] [ str "ms" ]
                     ]
-                    span [ _id "chunk-size-value"; _class "control-value" ] [ str "bytes" ]
-                ]
-                div [ _class "preset-buttons" ] [
-                    button [ _type "button"; _class "preset"; attr "data-preset-chunk" "256" ] [ str "256B" ]
-                    button [ _type "button"; _class "preset"; attr "data-preset-chunk" "512" ] [ str "512B" ]
-                    button [ _type "button"; _class "preset"; attr "data-preset-chunk" "1024" ] [ str "1KB" ]
-                    button [ _type "button"; _class "preset"; attr "data-preset-chunk" "2048" ] [ str "2KB" ]
-                ]
-            ]
-            
-            div [ _class "section-header" ] [ str "📝 Text Formatting" ]
-            div [ _class "control-section checkbox-group" ] [
-                label [ _class "checkbox-label" ] [
-                    input [ _type "checkbox"; _id "append-newline"; _name "append-newline"; if controls.AppendNewlineAtEnd then attr "checked" "checked" ]
-                    str "Append newline at end"
+                    div [ _class "preset-buttons" ] [
+                        button [ _type "button"; _class "preset"; attr "data-preset-delay" "0" ] [ str "Instant" ]
+                        button [ _type "button"; _class "preset"; attr "data-preset-delay" "2" ] [ str "2ms" ]
+                        button [ _type "button"; _class "preset"; attr "data-preset-delay" "5" ] [ str "5ms" ]
+                        button [ _type "button"; _class "preset"; attr "data-preset-delay" "10" ] [ str "10ms" ]
+                    ]
                 ]
                 
-                label [ _class "checkbox-label" ] [
-                    input [ _type "checkbox"; _id "normalize-endings"; _name "normalize-endings"; if controls.NormalizeLineEndings then attr "checked" "checked" ]
-                    str "Normalize line endings (CRLF → LF)"
+                div [ _class "section-header" ] [
+                    span [ _class "material-symbols-rounded sm" ] [ str "inventory_2" ]
+                    str "Reliability"
+                ]
+                div [ _class "control-section" ] [
+                    label [ _for "chunk-size" ] [
+                        str "Chunk size (chars): "
+                        span [ _class "control-hint"; _title "Text is sent in chunks of this many characters. Smaller chunks help with apps that drop input under load." ] [ str "(for apps that drop keys under load)" ]
+                    ]
+                    div [ _class "control-row" ] [
+                        input [
+                            _type "range"
+                            _id "chunk-size"
+                            _name "chunk-size"
+                            _min "1"
+                            _max "10000"
+                            _value (string controls.ChunkSize)
+                            _class "control-slider"
+                        ]
+                        input [
+                            _type "number"
+                            _id "chunk-size-input"
+                            _min "1"
+                            _max "10000"
+                            _value (string controls.ChunkSize)
+                            _class "control-number-input"
+                        ]
+                        span [ _id "chunk-size-value"; _class "control-value" ] [ str "chars" ]
+                    ]
+                    div [ _class "preset-buttons" ] [
+                        button [ _type "button"; _class "preset"; attr "data-preset-chunk" "256" ] [ str "256c" ]
+                        button [ _type "button"; _class "preset"; attr "data-preset-chunk" "512" ] [ str "512c" ]
+                        button [ _type "button"; _class "preset"; attr "data-preset-chunk" "1024" ] [ str "1Kc" ]
+                        button [ _type "button"; _class "preset"; attr "data-preset-chunk" "2048" ] [ str "2Kc" ]
+                    ]
                 ]
                 
-                div [ _class "section-divider" ] []
-                
-                label [ _class "checkbox-label" ] [
-                    input [ _type "checkbox"; _id "private-send"; _name "private-send" ]
-                    str "🔒 Private send (don't save to history)"
+                div [ _class "section-header" ] [
+                    span [ _class "material-symbols-rounded sm" ] [ str "edit_note" ]
+                    str "Text Formatting"
                 ]
-                
-                label [ _class "checkbox-label" ] [
-                    input [ _type "checkbox"; _id "auto-retry"; _name "auto-retry"; _title "Automatically retry connection every 5 seconds when disconnected" ]
-                    str "🔄 Auto-retry (every 5s when disconnected)"
+                div [ _class "control-section checkbox-group" ] [
+                    label [ _class "checkbox-label" ] [
+                        input [ _type "checkbox"; _id "append-newline"; _name "append-newline"; if controls.AppendNewlineAtEnd then attr "checked" "checked" ]
+                        str "Append newline at end"
+                    ]
+                    
+                    label [ _class "checkbox-label" ] [
+                        input [ _type "checkbox"; _id "normalize-endings"; _name "normalize-endings"; if controls.NormalizeLineEndings then attr "checked" "checked" ]
+                        str "Normalize line endings (CRLF → LF)"
+                    ]
+                    
+                    div [ _class "section-divider" ] []
+                    
+                    label [ _class "checkbox-label" ] [
+                        input [ _type "checkbox"; _id "private-send"; _name "private-send" ]
+                        span [ _class "material-symbols-rounded sm" ] [ str "lock" ]
+                        str "Private send (don't save to history)"
+                    ]
+                    
+                    label [ _class "checkbox-label" ] [
+                        input [ _type "checkbox"; _id "auto-retry"; _name "auto-retry"; _title "Automatically retry connection every 5 seconds when disconnected" ]
+                        span [ _class "material-symbols-rounded sm" ] [ str "sync" ]
+                        str "Auto-retry (every 5s when disconnected)"
+                    ]
+                    
+                    div [ _id "retry-countdown"; _class "retry-countdown" ] []
                 ]
-                
-                div [ _id "retry-countdown"; _class "retry-countdown" ] []
             ]
         ]
 
@@ -415,67 +432,21 @@ module Views =
     let renderHistoryDropdown () =
         div [ _id "history-list"; _class "history-dropdown hidden" ] []
 
-    let renderKeyboardToggle (visibility: KeyboardVisibility) =
-        let (buttonText, isVisible) = 
-            match visibility with
-            | Visible -> ("Hide Keyboard", true)
-            | Hidden -> ("Show Keyboard", false)
-        
-        div [ _class "keyboard-toggle-container" ] [
-            button 
-                [ _type "button"
-                  _id "keyboard-toggle"
-                  _class "secondary"
-                  _title (sprintf "%s to make text area larger" buttonText)
-                  attr "aria-pressed" (if isVisible then "true" else "false") ]
-                [ str buttonText ]
-        ]
-
-    let renderKeyboardSection (model: IndexViewModel) =
-        let visibilityClass = match model.KeyboardVisibility with
-                              | Visible -> "keyboard-visible"
-                              | Hidden -> "keyboard-hidden"
+    let renderKeyboardPanel (model: IndexViewModel) =
         let isConnected = match model.ConnectionStatus with
                           | Connected _ -> true
                           | NotConnected _ -> false
-        
-        div [ _class (sprintf "keyboard-section %s" visibilityClass); _id "keyboard-section" ] [
-            renderSpecialKeys isConnected
-        ]
-
-    let renderConnectionBanner (settings: SenderSettings) (connectionStatus: ConnectionStatus) =
-        let bannerClass = getConnectionCssClass connectionStatus
-        let bannerText = formatConnectionStatus settings connectionStatus
-        let targetDisplay = sprintf "%s:%d" settings.TargetIp settings.TargetPort
-        
-        div [ _class (sprintf "connection-banner %s" bannerClass) ] [
-            span [ _class "connection-icon" ] []
-            div [ _class "connection-content" ] [
-                div [ _class "connection-text" ] [ str bannerText ]
-                // Show target info with copy button
-                div [ _class "connection-target" ] [ 
-                    str "Target: "
-                    span [ _id "target-display" ] [ str targetDisplay ]
-                    button [ _type "button"; _id "copy-target"; _class "copy-btn"; _title "Copy target address" ] [ str "📋" ]
-                ]
-                // Collapsible help section for disconnected state
-                match connectionStatus with
-                | NotConnected info ->
-                    details [ _class "connection-details" ] [
-                        summary [ _class "connection-details-summary" ] [ str "▶ Details" ]
-                        div [ _class "connection-details-content" ] [
-                            div [ _class "connection-suggestion" ] [
-                                str info.Suggestion
-                            ]
-                            if Option.isSome info.LastAttempt then
-                                div [ _class "connection-meta" ] [
-                                    str (formatLastAttempt info.LastAttempt)
-                                    if info.RetryCount > 0 then
-                                        str (sprintf " | Retries: %d" info.RetryCount)
-                                ]
-                        ]
-                    ]
-                | Connected _ -> ()
+        let isVisible =
+            match model.KeyboardVisibility with
+            | Visible -> true
+            | Hidden -> false
+        details [ _class "keyboard-panel"; if isVisible then attr "open" "open" ] [
+            summary [ _class "keyboard-summary" ] [
+                span [ _class "material-symbols-rounded sm" ] [ str "keyboard" ]
+                str "Keyboard"
+            ]
+            div [ _class "keyboard-section"; _id "keyboard-section" ] [
+                renderSpecialKeys isConnected
             ]
         ]
 
@@ -488,22 +459,31 @@ module Views =
               [ _id "text"; _name "text"; _placeholder "Paste text here..." ]
               [ str model.Text ]
           renderHistoryControls isConnected
+          renderKeyboardPanel model
           renderStatusLine ()
           renderHistoryDropdown ()
           renderSendingControls model.SendingControls
-          renderKeyboardToggle model.KeyboardVisibility
-          renderKeyboardSection model
           renderHint () ]
 
-    let renderHeader (settings: SenderSettings) (model: IndexViewModel) showTarget =
-        [ div [ _class "status-panel" ] [
+    let renderHeader (settings: SenderSettings) (model: IndexViewModel) _showTarget =
+        let connectionTooltip =
+            let targetLine = sprintf "Target: %s:%d" settings.TargetIp settings.TargetPort
+            let statusLine = formatConnectionStatus settings model.ConnectionStatus
+            let extraLines =
+                match model.ConnectionStatus with
+                | Connected _ -> []
+                | NotConnected info ->
+                    let lastAttemptLine = formatLastAttempt info.LastAttempt
+                    let retryLine = if info.RetryCount > 0 then sprintf "Retries: %d" info.RetryCount else ""
+                    [ info.Suggestion; lastAttemptLine; retryLine ]
+                    |> List.filter (String.IsNullOrWhiteSpace >> not)
+            String.concat "\n" (statusLine :: targetLine :: extraLines)
+        [ div [ _class "status-panel"; attr "data-tooltip" connectionTooltip; attr "aria-label" connectionTooltip ] [
               span [ _id "usb-status"
                      _class (sprintf "usb-dot %s" model.UsbStatus.CssClass)
-                     _title model.UsbStatus.Text
                      attr "aria-label" model.UsbStatus.Text ] []
               span [ _id "caps-status"
                      _class (sprintf "caps-dot %s" model.CapsLock.CssClass)
-                     _title model.CapsLock.Text
                      attr "aria-label" model.CapsLock.Text ] []
           ]
           h1 [] [ 
@@ -517,22 +497,16 @@ module Views =
                   str (ConnectionRetryService.formatRetryStatus model.RetryState)
               ]
         ]
-        @ (if showTarget then
-               [ p [ _class "target" ] [ str (sprintf "Target device: %s:%d" settings.TargetIp settings.TargetPort) ] ]
-           else
-               [])
 
     let renderPage (settings: SenderSettings) (model: IndexViewModel) showDevInfo : HttpHandler =
         let statusNodes = buildStatusNodes showDevInfo settings model.Status model.SendStartTime
         let headerNodes = renderHeader settings model showDevInfo
-        let connectionBannerNode = renderConnectionBanner settings model.ConnectionStatus
         let formNodes = renderForm model
 
         html [] [
             renderHead ()
             body (bodyAttrs model.IsMobile)
-                ([ connectionBannerNode ]
-                 @ headerNodes
+                (headerNodes
                  @ statusNodes
                  @ [ form
                          [ _method "post"; _action "/send" ]

@@ -3,8 +3,8 @@ namespace SenderApp
 open System
 
 type SendingProgress =
-    { BytesSent: int
-      TotalBytes: int }
+    { CharactersSent: int
+      TotalCharacters: int }
 
 type SendStatus =
     | Idle
