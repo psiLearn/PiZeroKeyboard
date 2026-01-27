@@ -26,6 +26,10 @@ module HistoryTests =
         Assert.Equal(3, clampIndex 10 3)
 
     [<Fact>]
+    let ``clampIndex handles negative maxIndex`` () =
+        Assert.Equal(0, clampIndex 5 -1)
+
+    [<Fact>]
     let ``addEntry appends and updates index`` () =
         let items = [ mkItem "first" 1.0 ]
         let state = addEntry now items "second"
@@ -43,6 +47,15 @@ module HistoryTests =
         Assert.Equal(2, state.items.Length)
         Assert.Equal("beta", state.items |> List.last |> fun item -> item.text)
         Assert.Equal(1, state.index)
+
+    [<Fact>]
+    let ``addEntry inserts into empty history`` () =
+        let items: HistoryItem list = []
+        let state = addEntry now items "first"
+
+        Assert.Single(state.items) |> ignore
+        Assert.Equal("first", state.items.Head.text)
+        Assert.Equal(0, state.index)
 
     [<Fact>]
     let ``addEntry prunes to maxHistoryItems`` () =
@@ -68,3 +81,9 @@ module HistoryTests =
         let empty: HistoryItem list = []
         Assert.Equal(0, movePrev 0 empty)
         Assert.Equal(0, moveNext 0 empty)
+
+    [<Fact>]
+    let ``movePrev and moveNext clamp out of bounds`` () =
+        let items = [ mkItem "a" 1.0; mkItem "b" 2.0 ]
+        Assert.Equal(0, movePrev -1 items)
+        Assert.Equal(1, moveNext 10 items)

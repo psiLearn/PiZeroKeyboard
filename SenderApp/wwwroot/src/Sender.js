@@ -273,15 +273,30 @@ export function applyHistory() {
     }
 }
 
-export function renderHistoryList() {
+export function tryGetHistoryList() {
     const historyList = document.getElementById("history-list");
-    if (!(historyList == null)) {
+    if (historyList == null) {
+        return undefined;
+    }
+    else {
+        return some(historyList);
+    }
+}
+
+export function renderHistoryEmpty(historyList) {
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.textContent = "No history yet.";
+    historyList.appendChild(empty);
+}
+
+export function renderHistoryList() {
+    const matchValue = tryGetHistoryList();
+    if (matchValue != null) {
+        const historyList = value_7(matchValue);
         historyList.innerHTML = "";
         if (isEmpty(historyItems())) {
-            const empty = document.createElement("div");
-            empty.className = "history-empty";
-            empty.textContent = "No history yet.";
-            historyList.appendChild(empty);
+            renderHistoryEmpty(historyList);
         }
         else {
             iterateIndexed((index, item) => {
@@ -295,11 +310,7 @@ export function renderHistoryList() {
                 button.textContent = formatHistoryPreview(item);
                 button.addEventListener("click", ((event) => {
                     event.preventDefault();
-                    historyIndex(index);
-                    writeHistoryIndex(historyIndex());
-                    applyHistory();
-                    updateHistoryButtons();
-                    renderHistoryList();
+                    setHistoryIndex(index);
                     const historyClassList = historyList.classList;
                     historyClassList.add("hidden");
                 }));
@@ -307,6 +318,14 @@ export function renderHistoryList() {
             }, historyItems());
         }
     }
+}
+
+export function setHistoryIndex(index) {
+    historyIndex(index);
+    writeHistoryIndex(historyIndex());
+    applyHistory();
+    updateHistoryButtons();
+    renderHistoryList();
 }
 
 export function refreshHistoryState() {
@@ -317,48 +336,41 @@ export function refreshHistoryState() {
     renderHistoryList();
 }
 
+export function bindHistoryButton(id, moveFn) {
+    const button = document.getElementById(id);
+    if (!(button == null)) {
+        button.addEventListener("click", ((event) => {
+            event.preventDefault();
+            if (!isEmpty(historyItems())) {
+                setHistoryIndex(moveFn(historyIndex(), historyItems()));
+            }
+        }));
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
 export function initHistoryNavigation() {
-    const historyBack = document.getElementById("history-prev");
-    const historyForward = document.getElementById("history-next");
-    if (!(historyBack == null) ? true : !(historyForward == null)) {
+    if (bindHistoryButton("history-prev", movePrev) ? true : bindHistoryButton("history-next", moveNext)) {
         refreshHistoryState();
-        if (!(historyBack == null)) {
-            historyBack.addEventListener("click", ((event) => {
-                event.preventDefault();
-                if (!isEmpty(historyItems())) {
-                    historyIndex(movePrev(historyIndex(), historyItems()));
-                    writeHistoryIndex(historyIndex());
-                    applyHistory();
-                    updateHistoryButtons();
-                    renderHistoryList();
-                }
-            }));
-        }
-        if (!(historyForward == null)) {
-            historyForward.addEventListener("click", ((event_1) => {
-                event_1.preventDefault();
-                if (!isEmpty(historyItems())) {
-                    historyIndex(moveNext(historyIndex(), historyItems()));
-                    writeHistoryIndex(historyIndex());
-                    applyHistory();
-                    updateHistoryButtons();
-                    renderHistoryList();
-                }
-            }));
-        }
     }
 }
 
 export function initHistoryToggle() {
     const historyToggle = document.getElementById("history-toggle");
-    const historyList = document.getElementById("history-list");
-    if (!(historyToggle == null) && !(historyList == null)) {
-        historyToggle.addEventListener("click", ((event) => {
-            event.preventDefault();
-            renderHistoryList();
-            const classList = historyList.classList;
-            classList.toggle("hidden");
-        }));
+    const matchValue = tryGetHistoryList();
+    if (matchValue != null) {
+        const historyList = value_7(matchValue);
+        if (!(historyToggle == null)) {
+            historyToggle.addEventListener("click", ((event) => {
+                event.preventDefault();
+                renderHistoryList();
+                const classList = historyList.classList;
+                classList.toggle("hidden");
+            }));
+        }
     }
 }
 

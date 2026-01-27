@@ -207,36 +207,47 @@ let applyHistory () =
         textarea?setSelectionRange(caret, caret)
         textarea?focus()
 
-let rec renderHistoryList () =
+let tryGetHistoryList () =
     let historyList: obj = getElementById "history-list"
-    if not (isNull historyList) then
+    if isNull historyList then None else Some historyList
+
+let renderHistoryEmpty (historyList: obj) =
+    let empty = createElement "div"
+    empty?className <- "history-empty"
+    empty?textContent <- "No history yet."
+    historyList?appendChild(empty) |> ignore
+
+let rec renderHistoryList () =
+    match tryGetHistoryList () with
+    | None -> ()
+    | Some historyList ->
+        let renderButton index item =
+            let button: obj = createElement "button"
+            button?``type`` <- "button"
+            button?className <- "history-item"
+            if index = historyIndex then
+                let classList: obj = button?classList
+                classList?add("active") |> ignore
+            button?textContent <- formatHistoryPreview item
+            let onClick (event: obj) =
+                event?preventDefault()
+                setHistoryIndex index
+                let historyClassList: obj = historyList?classList
+                historyClassList?add("hidden") |> ignore
+            button?addEventListener("click", onClick)
+            historyList?appendChild(button) |> ignore
         historyList?innerHTML <- ""
         if historyItems.IsEmpty then
-            let empty = createElement "div"
-            empty?className <- "history-empty"
-            empty?textContent <- "No history yet."
-            historyList?appendChild(empty) |> ignore
+            renderHistoryEmpty historyList
         else
-            historyItems
-            |> List.iteri (fun index item ->
-                let button: obj = createElement "button"
-                button?``type`` <- "button"
-                button?className <- "history-item"
-                if index = historyIndex then
-                    let classList: obj = button?classList
-                    classList?add("active") |> ignore
-                button?textContent <- formatHistoryPreview item
-                let onClick (event: obj) =
-                    event?preventDefault()
-                    historyIndex <- index
-                    writeHistoryIndex historyIndex
-                    applyHistory()
-                    updateHistoryButtons()
-                    renderHistoryList()
-                    let historyClassList: obj = historyList?classList
-                    historyClassList?add("hidden") |> ignore
-                button?addEventListener("click", onClick)
-                historyList?appendChild(button) |> ignore)
+            historyItems |> List.iteri renderButton
+
+and setHistoryIndex index =
+    historyIndex <- index
+    writeHistoryIndex historyIndex
+    applyHistory()
+    updateHistoryButtons()
+    renderHistoryList()
 
 let refreshHistoryState () =
     let state = loadHistoryState()
@@ -245,39 +256,35 @@ let refreshHistoryState () =
     updateHistoryButtons()
     renderHistoryList()
 
+let bindHistoryButton id moveFn =
+    let button = getElementById id
+    if not (isNull button) then
+        button?addEventListener("click", fun (event: obj) ->
+            event?preventDefault()
+            if not historyItems.IsEmpty then
+                let nextIndex = moveFn historyIndex historyItems
+                setHistoryIndex nextIndex)
+        true
+    else
+        false
+
 let initHistoryNavigation () =
-    let historyBack = getElementById "history-prev"
-    let historyForward = getElementById "history-next"
-    if (not (isNull historyBack)) || (not (isNull historyForward)) then
+    let backBound = bindHistoryButton "history-prev" movePrev
+    let forwardBound = bindHistoryButton "history-next" moveNext
+    if backBound || forwardBound then
         refreshHistoryState()
-        if not (isNull historyBack) then
-            historyBack?addEventListener("click", fun (event: obj) ->
-                event?preventDefault()
-                if not historyItems.IsEmpty then
-                    historyIndex <- movePrev historyIndex historyItems
-                    writeHistoryIndex historyIndex
-                    applyHistory()
-                    updateHistoryButtons()
-                    renderHistoryList())
-        if not (isNull historyForward) then
-            historyForward?addEventListener("click", fun (event: obj) ->
-                event?preventDefault()
-                if not historyItems.IsEmpty then
-                    historyIndex <- moveNext historyIndex historyItems
-                    writeHistoryIndex historyIndex
-                    applyHistory()
-                    updateHistoryButtons()
-                    renderHistoryList())
 
 let initHistoryToggle () =
     let historyToggle: obj = getElementById "history-toggle"
-    let historyList: obj = getElementById "history-list"
-    if not (isNull historyToggle) && not (isNull historyList) then
-        historyToggle?addEventListener("click", fun (event: obj) ->
-            event?preventDefault()
-            renderHistoryList()
-            let classList: obj = historyList?classList
-            classList?toggle("hidden") |> ignore)
+    match tryGetHistoryList () with
+    | None -> ()
+    | Some historyList ->
+        if not (isNull historyToggle) then
+            historyToggle?addEventListener("click", fun (event: obj) ->
+                event?preventDefault()
+                renderHistoryList()
+                let classList: obj = historyList?classList
+                classList?toggle("hidden") |> ignore)
 
 let initKeyboardShortcuts () =
     let textarea = getElementById "text"
