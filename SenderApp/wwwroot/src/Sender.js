@@ -112,58 +112,88 @@ export function initStatusRefresh() {
     }
 }
 
+export function clearIntervalIfAny(timer) {
+    if (timer == null) {
+    }
+    else {
+        const id = value_7(timer);
+        (globalThis).clearInterval(id);
+    }
+}
+
+export function clearRetryCountdown() {
+    clearIntervalIfAny(retryCountdownTimer());
+    retryCountdownTimer(undefined);
+    nextRetryCountdown(0);
+    updateRetryCountdown();
+}
+
+export function isUsbConnected() {
+    const statusEl = document.getElementById("usb-status");
+    if (statusEl == null) {
+        return false;
+    }
+    else {
+        try {
+            const classList = statusEl.classList;
+            return classList.contains("connected");
+        }
+        catch (matchValue) {
+            return false;
+        }
+    }
+}
+
+export function startAutoRetryTimer() {
+    clearIntervalIfAny(autoRetryTimer());
+    const timer = (globalThis).setInterval((() => {
+        if (!isUsbConnected()) {
+            refreshStatus();
+            startRetryCountdown(5);
+        }
+    }), 5000);
+    autoRetryTimer(some(timer));
+}
+
+export function stopAutoRetryTimer() {
+    clearIntervalIfAny(autoRetryTimer());
+    autoRetryTimer(undefined);
+    clearRetryCountdown();
+}
+
 export function initAutoRetry() {
     const checkbox = document.getElementById("auto-retry");
     if (!(checkbox == null)) {
         checkbox.addEventListener("change", ((_arg) => {
             autoRetryEnabled(checkbox.checked);
             if (autoRetryEnabled()) {
-                if (autoRetryTimer() == null) {
-                }
-                else {
-                    const id = value_7(autoRetryTimer());
-                    (globalThis).clearInterval(id);
-                }
-                const timer = (globalThis).setInterval((() => {
-                    const statusEl = document.getElementById("usb-status");
-                    if (!((statusEl == null) ? false : (() => {
-                        try {
-                            const classList = statusEl.classList;
-                            return classList.contains("connected");
-                        }
-                        catch (matchValue) {
-                            return false;
-                        }
-                    })())) {
-                        refreshStatus();
-                        startRetryCountdown(5);
-                    }
-                }), 5000);
-                autoRetryTimer(some(timer));
+                startAutoRetryTimer();
             }
             else {
-                if (autoRetryTimer() == null) {
-                }
-                else {
-                    const id_1 = value_7(autoRetryTimer());
-                    (globalThis).clearInterval(id_1);
-                }
-                autoRetryTimer(undefined);
-                if (retryCountdownTimer() == null) {
-                }
-                else {
-                    const id_2 = value_7(retryCountdownTimer());
-                    (globalThis).clearInterval(id_2);
-                }
-                retryCountdownTimer(undefined);
-                nextRetryCountdown(0);
-                updateRetryCountdown();
+                stopAutoRetryTimer();
             }
         }));
     }
 }
 
+export function applyStatusSafe(payload) {
+    try {
+        applyStatus(JSON.parse(toString(payload)));
+    }
+    catch (matchValue) {
+        applyStatus({
+            text: "Raspberry Pi USB: unknown",
+            cssClass: "unknown",
+        });
+    }
+}
+
 export function setupWebSocketConnection() {
+    const scheduleWebSocketReconnect = () => {
+        (globalThis).setTimeout((() => {
+            setupWebSocketConnection();
+        }), 3000);
+    };
     if ((() => {
         try {
             return !((globalThis).WebSocket == null);
@@ -178,27 +208,15 @@ export function setupWebSocketConnection() {
             const url = toText(printf("%s//%s/status/ws"))(scheme)(host);
             const socket = new WebSocket(url);
             socket.onmessage = ((event) => {
-                try {
-                    applyStatus(JSON.parse(toString(event.data)));
-                }
-                catch (matchValue_1) {
-                    applyStatus({
-                        text: "Raspberry Pi USB: unknown",
-                        cssClass: "unknown",
-                    });
-                }
+                applyStatusSafe(event.data);
             });
             socket.onerror = ((_arg) => (socket.close()));
             socket.onclose = ((_arg_1) => {
-                (globalThis).setTimeout((() => {
-                    setupWebSocketConnection();
-                }), 3000);
+                scheduleWebSocketReconnect();
             });
         }
-        catch (matchValue_2) {
-            (globalThis).setTimeout((() => {
-                setupWebSocketConnection();
-            }), 3000);
+        catch (matchValue_1) {
+            scheduleWebSocketReconnect();
         }
     }
 }

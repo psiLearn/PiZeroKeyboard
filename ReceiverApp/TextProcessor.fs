@@ -106,22 +106,28 @@ module TextProcessor =
         if isNull text then
             invalidArg (nameof text) "Text cannot be null."
 
-        let mutable currentLayout = layout
-
-        let sendTextChar c =
+        let sendTextChar currentLayout c =
             match HidMapping.toHid currentLayout c with
             | Some hid -> send hid
             | None -> logUnsupported c
 
-        tokenize text
-        |> Seq.iter (fun token ->
+        let sendLiteralToken currentLayout tokenText =
+            for ch in "{" + tokenText + "}" do
+                sendTextChar currentLayout ch
+
+        let handleToken currentLayout token =
             match token with
-            | LayoutSwitch newLayout -> currentLayout <- newLayout
-            | SpecialKey hid -> send hid
+            | LayoutSwitch newLayout -> newLayout
+            | SpecialKey hid ->
+                send hid
+                currentLayout
             | ChordToken tokenText ->
                 match tryParseChord currentLayout tokenText with
                 | Some hid -> send hid
-                | None ->
-                    for ch in "{" + tokenText + "}" do
-                        sendTextChar ch
-            | TextChar c -> sendTextChar c)
+                | None -> sendLiteralToken currentLayout tokenText
+                currentLayout
+            | TextChar c ->
+                sendTextChar currentLayout c
+                currentLayout
+
+        tokenize text |> Seq.fold handleToken layout |> ignore

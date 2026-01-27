@@ -99,41 +99,57 @@ let initStatusRefresh () =
             event?preventDefault()
             refreshStatus())
 
+let clearIntervalIfAny timer =
+    match timer with
+    | Some id -> globalThis?clearInterval(id)
+    | None -> ()
+
+let clearRetryCountdown () =
+    clearIntervalIfAny retryCountdownTimer
+    retryCountdownTimer <- None
+    nextRetryCountdown <- 0
+    updateRetryCountdown()
+
+let isUsbConnected () =
+    let statusEl = getElementById "usb-status"
+    if isNull statusEl then false
+    else
+        try
+            let classList: obj = statusEl?classList
+            classList?contains("connected") |> unbox<bool>
+        with _ -> false
+
+let startAutoRetryTimer () =
+    clearIntervalIfAny autoRetryTimer
+    let timer =
+        globalThis?setInterval((fun () ->
+            if not (isUsbConnected ()) then
+                refreshStatus()
+                startRetryCountdown 5), 5000)
+    autoRetryTimer <- Some timer
+
+let stopAutoRetryTimer () =
+    clearIntervalIfAny autoRetryTimer
+    autoRetryTimer <- None
+    clearRetryCountdown ()
+
 let initAutoRetry () =
     let checkbox = getElementById "auto-retry"
     if not (isNull checkbox) then
         checkbox?addEventListener("change", fun (_: obj) ->
             autoRetryEnabled <- unbox<bool> checkbox?``checked``
-            if autoRetryEnabled then
-                match autoRetryTimer with
-                | Some id -> globalThis?clearInterval(id)
-                | None -> ()
-                let timer = globalThis?setInterval((fun () ->
-                    let statusEl = getElementById "usb-status"
-                    let isConnected =
-                        if isNull statusEl then false
-                        else
-                            try
-                                let classList: obj = statusEl?classList
-                                classList?contains("connected") |> unbox<bool>
-                            with _ -> false
-                    if not isConnected then
-                        refreshStatus()
-                        startRetryCountdown 5), 5000)
-                autoRetryTimer <- Some timer
-            else
-                match autoRetryTimer with
-                | Some id -> globalThis?clearInterval(id)
-                | None -> ()
-                autoRetryTimer <- None
-                match retryCountdownTimer with
-                | Some id -> globalThis?clearInterval(id)
-                | None -> ()
-                retryCountdownTimer <- None
-                nextRetryCountdown <- 0
-                updateRetryCountdown())
+            if autoRetryEnabled then startAutoRetryTimer () else stopAutoRetryTimer ())
+
+let applyStatusSafe (payload: obj) =
+    try
+        let data = JS.JSON.parse (string payload)
+        applyStatus data
+    with _ ->
+        applyStatus (createObj [ "text" ==> "Raspberry Pi USB: unknown"; "cssClass" ==> "unknown" ])
 
 let rec setupWebSocketConnection () =
+    let scheduleWebSocketReconnect () =
+        globalThis?setTimeout((fun () -> setupWebSocketConnection()), 3000) |> ignore
     let hasWebSocket =
         try not (isNull globalThis?WebSocket)
         with _ -> false
@@ -143,17 +159,11 @@ let rec setupWebSocketConnection () =
             let host = string (globalThis?location?host)
             let url = sprintf "%s//%s/status/ws" scheme host
             let socket = newWebSocket url
-            socket?onmessage <- (fun (event: obj) ->
-                try
-                    let data = JS.JSON.parse (string event?data)
-                    applyStatus data
-                with _ ->
-                    applyStatus (createObj [ "text" ==> "Raspberry Pi USB: unknown"; "cssClass" ==> "unknown" ]))
+            socket?onmessage <- (fun (event: obj) -> applyStatusSafe event?data)
             socket?onerror <- (fun (_: obj) -> socket?close())
-            socket?onclose <- (fun (_: obj) ->
-                globalThis?setTimeout((fun () -> setupWebSocketConnection()), 3000) |> ignore)
+            socket?onclose <- (fun (_: obj) -> scheduleWebSocketReconnect ())
         with _ ->
-            globalThis?setTimeout((fun () -> setupWebSocketConnection()), 3000) |> ignore
+            scheduleWebSocketReconnect ()
 
 let insertToken (token: string) =
     let textarea = getElementById "text"

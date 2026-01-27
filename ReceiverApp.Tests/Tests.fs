@@ -150,6 +150,31 @@ let ``processText switches layout via token`` () =
     Assert.Empty(unsupported)
 
 [<Fact>]
+let ``processText switches layout via colon token`` () =
+    let sent = ResizeArray<HidKey>()
+    let unsupported = ResizeArray<char>()
+
+    TextProcessor.processText sent.Add unsupported.Add defaultLayout "{LAYOUT:de}yz"
+
+    Assert.Equal<int>(2, sent.Count)
+    Assert.Equal(0x1Duy, sent.[0].Key)
+    Assert.Equal(0x1Cuy, sent.[1].Key)
+    Assert.Empty(unsupported)
+
+[<Fact>]
+let ``processText keeps unknown token literal`` () =
+    let sent = ResizeArray<HidKey>()
+    let unsupported = ResizeArray<char>()
+    let expected = "{UNKNOWN}"
+
+    TextProcessor.processText sent.Add unsupported.Add defaultLayout expected
+
+    Assert.Equal(expected.Length, sent.Count)
+    Assert.Equal(0x2Fuy, sent.[0].Key)
+    Assert.Equal(0x30uy, sent.[sent.Count - 1].Key)
+    Assert.Empty(unsupported)
+
+[<Fact>]
 let ``toHid uses german layout swaps y and z`` () =
     let yKey = HidMapping.toHid KeyboardLayout.De 'y'
     let zKey = HidMapping.toHid KeyboardLayout.De 'z'

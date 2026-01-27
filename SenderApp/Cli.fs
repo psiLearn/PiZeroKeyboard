@@ -13,6 +13,18 @@ module Cli =
             eprintfn "Invalid port '%s'." port
             1
 
+    let private resolveTargetIp (argv: string[]) defaultIp =
+        if argv.Length >= 1 && not (String.IsNullOrWhiteSpace argv.[0]) then
+            argv.[0]
+        else
+            defaultIp
+
+    let private resolvePortValue (argv: string[]) defaultPort =
+        if argv.Length >= 2 then
+            argv.[1]
+        else
+            defaultPort.ToString()
+
     let run (argv: string[]) =
         match argv with
         | [| "--help" |] | [| "-h" |] -> usage ()
@@ -23,17 +35,8 @@ module Cli =
                 envOrDefault "SENDER_TARGET_PORT" "5000"
                 |> fun value -> defaultArg (tryParsePort value) 5000
 
-            let targetIp =
-                if argv.Length >= 1 && not (String.IsNullOrWhiteSpace argv.[0]) then
-                    argv.[0]
-                else
-                    defaultIp
-
-            let portValue =
-                if argv.Length >= 2 then
-                    argv.[1]
-                else
-                    defaultPort.ToString()
+            let targetIp = resolveTargetIp argv defaultIp
+            let portValue = resolvePortValue argv defaultPort
 
             match tryParsePort portValue with
             | Some targetPort -> startWebServer argv targetIp targetPort
