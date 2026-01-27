@@ -23,7 +23,8 @@ param(
     [int]$SshTimeoutSec = 15,
     [switch]$CompressTransfers,
     [switch]$SkipBuild,
-    [switch]$SkipUpload
+    [switch]$SkipUpload,
+    [switch]$NoCache
 )
 
 Set-StrictMode -Version Latest
@@ -156,11 +157,14 @@ if (-not $SkipBuild) {
 
 if (-not $SkipBuild) {
     Write-Host "Building receiver image ($Platform) -> $tarPath" -ForegroundColor Cyan
+    $cacheArgs = @()
+    if ($NoCache) { $cacheArgs += "--no-cache" }
     docker buildx build `
         --platform $Platform `
         -f (Join-Path $PSScriptRoot "Dockerfile.receiver") `
         -t $ReceiverImage `
         --load `
+        @cacheArgs `
         $PSScriptRoot
     docker save -o $tarPath $ReceiverImage
 
@@ -170,6 +174,7 @@ if (-not $SkipBuild) {
         -f (Join-Path $PSScriptRoot "Dockerfile.sender") `
         -t $SenderImage `
         --load `
+        @cacheArgs `
         $PSScriptRoot
     docker save -o $senderTar $SenderImage
 }

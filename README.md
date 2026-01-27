@@ -54,6 +54,7 @@ If Node/npm are missing, the build will still succeed but the UI bundle may be s
 3. Insert the SD card into the Pi Zero 2 W and boot. Find the IP (router/DHCP list).
 4. On Windows, deploy the Docker stack over SSH:
    - `.\deploy-docker-ssh.ps1 -Host <pi-ip> -User <username> -Port 5000 -Platform linux/arm/v7`
+   - Add `-NoCache` to force a clean Docker build when the UI/assets look stale.
 5. Open the sender UI at `http://<pi-ip>:8080` (host networking). If you enable HTTPS (see below), use `https://<pi-ip>:8443`. The receiver listens on port 5000.
 6. If `/sys/class/udc` is empty after boot, `dwc_otg` still owns the controller; verify the cmdline and reboot.
 
@@ -76,7 +77,7 @@ Why 32-bit? The Docker images in this repo are built for `linux/arm/v7`, which m
 ### Docker deployment
 
 - Build and copy the full stack (receiver + sender) to an SD card on Windows: `.\docker-build-to-sd.ps1 -BootDrive E: -Port 5000 -Platform linux/arm/v7`. This writes two image tars, a compose file, and `/boot/install-linuxkey-docker.sh`; on the Pi run `sudo /boot/install-linuxkey-docker.sh` to load images and bring up the compose stack (requires Docker and the compose plugin on the Pi).
-- Build and deploy over SSH: `.\deploy-docker-ssh.ps1 -Host 192.168.50.10 -User pi -Port 5000 -Platform linux/arm/v7`. This builds both images locally, copies them plus the compose file and HID setup script, then loads and runs the compose stack remotely (requires `ssh`/`scp` clients).
+- Build and deploy over SSH: `.\deploy-docker-ssh.ps1 -Host 192.168.50.10 -User pi -Port 5000 -Platform linux/arm/v7`. This builds both images locally, copies them plus the compose file and HID setup script, then loads and runs the compose stack remotely (requires `ssh`/`scp` clients). Add `-NoCache` to force a clean rebuild.
 - Compose stack runs on host networking; the sender UI is at `http://<pi-ip>:8080` and targets the receiver on `127.0.0.1:5000` by default. If HTTPS is enabled, it listens on `https://<pi-ip>:8443` and HTTP is disabled.
 - Note: .NET containers require armv7+; Pi Zero (armv6) cannot run these images. Use a Zero 2 / Pi 3+ or deploy directly without Docker on armv6 hardware.
 - Windows note: ensure Docker Desktop is running in **Linux containers** mode before running `deploy-docker-ssh.ps1`.
