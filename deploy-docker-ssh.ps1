@@ -24,6 +24,7 @@ param(
     [switch]$CompressTransfers,
     [switch]$SkipBuild,
     [switch]$SkipUpload,
+    [switch]$SkipApt,
     [switch]$NoCache
 )
 
@@ -255,13 +256,20 @@ if ($SkipUpload) {
 
 $remoteTemplate = @'
 set -e
+skip_apt="__SKIP_APT__"
 arch=$(uname -m)
 if [ "$arch" = "armv6l" ]; then
     echo "armv6l detected: .NET container images do not support Pi Zero (armv6). Use a Pi with armv7+ or deploy without Docker." >&2
     exit 1
 fi
-sudo apt-get update
+if [ "$skip_apt" != "true" ]; then
+  sudo apt-get update
+fi
 if ! command -v docker >/dev/null 2>&1; then
+    if [ "$skip_apt" = "true" ]; then
+      echo "Docker is missing and -SkipApt was set. Install Docker first or rerun without -SkipApt." >&2
+      exit 1
+    fi
     sudo apt-get install -y docker.io
 fi
 compose_cmd=""
@@ -270,6 +278,10 @@ if docker compose version >/dev/null 2>&1; then
 elif command -v docker-compose >/dev/null 2>&1; then
   compose_cmd="docker-compose"
 else
+  if [ "$skip_apt" = "true" ]; then
+    echo "Docker Compose is missing and -SkipApt was set. Install docker-compose or rerun without -SkipApt." >&2
+    exit 1
+  fi
   sudo apt-get install -y docker-compose-plugin || sudo apt-get install -y docker-compose
   if docker compose version >/dev/null 2>&1; then
     compose_cmd="docker compose"
@@ -330,7 +342,10 @@ sudo $compose_cmd -p "$compose_project" -f /tmp/docker-compose.yml down --remove
 sudo $compose_cmd -p "$compose_project" -f /tmp/docker-compose.yml up -d --force-recreate
 '@
 
-$remote = $remoteTemplate.Replace("__CERT_TEMP__", $remoteCertTemp).Replace("__CERT_DIR__", $remoteCertDir).Replace("__CERT_DEST__", $remoteCertPath)
+$remote = $remoteTemplate.Replace("__CERT_TEMP__", $remoteCertTemp)
+$remote = $remote.Replace("__CERT_DIR__", $remoteCertDir)
+$remote = $remote.Replace("__CERT_DEST__", $remoteCertPath)
+$remote = $remote.Replace("__SKIP_APT__", ($(if ($SkipApt) { "true" } else { "false" })))
 
 Write-Host "Deploying via SSH..." -ForegroundColor Cyan
 Invoke-SshWithRetry -Command $remote -Purpose "deploy"
