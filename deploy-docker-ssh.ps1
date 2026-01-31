@@ -94,6 +94,51 @@ function Ensure-DockerReady {
     throw "Docker engine is not reachable. Start Docker Desktop and ensure Linux containers are enabled, then retry."
 }
 
+function Get-TemplateContent {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) {
+        throw "Template not found at '$Path'."
+    }
+    return Get-Content -Raw -Path $Path
+}
+
+function Replace-TemplateTokens {
+    param(
+        [string]$Template,
+        [hashtable]$Tokens
+    )
+    $result = $Template
+    foreach ($key in $Tokens.Keys) {
+        $result = $result.Replace($key, [string]$Tokens[$key])
+    }
+    return $result
+}
+
+function Get-HttpsEnvBlock {
+    param(
+        [bool]$Enabled,
+        [string]$CertPath,
+        [string]$CertPassword,
+        [int]$HttpsPort
+    )
+    if (-not $Enabled) { return "" }
+    $lines = @("      - SENDER_HTTPS_CERT_PATH=$CertPath")
+    if (-not [string]::IsNullOrWhiteSpace($CertPassword)) {
+        $lines += "      - SENDER_HTTPS_CERT_PASSWORD=$CertPassword"
+    }
+    $lines += "      - SENDER_HTTPS_PORT=$HttpsPort"
+    return ($lines -join "`n") + "`n"
+}
+
+function Get-HttpsVolumeBlock {
+    param(
+        [bool]$Enabled,
+        [string]$CertDir
+    )
+    if (-not $Enabled) { return "" }
+    return ("      - {0}:{0}:ro`n" -f $CertDir)
+}
+
 $sshTarget = "${User}@${TargetHost}"
 $sshOptions = @(
     "-o", "ServerAliveInterval=30",
@@ -194,50 +239,19 @@ if (-not $skipBuildEffective) {
 }
 
 $composeTemp = Join-Path ([System.IO.Path]::GetTempPath()) ("linuxkey-compose-" + [System.Guid]::NewGuid().ToString("N") + ".yml")
-$httpsEnvLines = ""
-$httpsVolumeLine = ""
-if ($httpsEnabled) {
-    $httpsEnvLines = "      - SENDER_HTTPS_CERT_PATH=$remoteCertPath`n"
-    if (-not [string]::IsNullOrWhiteSpace($HttpsCertPassword)) {
-        $httpsEnvLines += "      - SENDER_HTTPS_CERT_PASSWORD=$HttpsCertPassword`n"
-    }
-    $httpsEnvLines += "      - SENDER_HTTPS_PORT=$HttpsPort`n"
-    $httpsVolumeLine = "      - ${remoteCertDir}:${remoteCertDir}:ro`n"
+$templatesDir = Join-Path $PSScriptRoot "deploy"
+$composeTemplatePath = Join-Path $templatesDir "docker-compose.template.yml"
+$remoteTemplatePath = Join-Path $templatesDir "remote-deploy.sh"
+$composeTemplate = Get-TemplateContent -Path $composeTemplatePath
+$httpsEnvBlock = Get-HttpsEnvBlock -Enabled $httpsEnabled -CertPath $remoteCertPath -CertPassword $HttpsCertPassword -HttpsPort $HttpsPort
+$httpsVolumeBlock = Get-HttpsVolumeBlock -Enabled $httpsEnabled -CertDir $remoteCertDir
+$composeContent = Replace-TemplateTokens -Template $composeTemplate -Tokens @{
+    "__RECEIVER_IMAGE__" = $ReceiverImage
+    "__SENDER_IMAGE__" = $SenderImage
+    "__PORT__" = $Port
+    "__HTTPS_ENV_BLOCK__" = $httpsEnvBlock
+    "__HTTPS_VOLUME_BLOCK__" = $httpsVolumeBlock
 }
-$composeContent = @"
-services:
-  receiver:
-    image: $ReceiverImage
-    privileged: true
-    network_mode: host
-    environment:
-      - RECEIVER_LAYOUT=en
-      - RECEIVER_CAPSLOCK_PATH=/run/linuxkey/capslock
-    devices:
-      - /dev/hidg0:/dev/hidg0
-    volumes:
-      - /run/linuxkey:/run/linuxkey
-    command: ["$Port"]
-    restart: unless-stopped
-
-  sender:
-    image: $SenderImage
-    network_mode: host
-    depends_on:
-      - receiver
-    restart: unless-stopped
-    user: "1000:1000"
-    environment:
-      - SENDER_TARGET_IP=127.0.0.1
-      - SENDER_TARGET_PORT=$Port
-      - SENDER_WEB_PORT=8080
-      - SENDER_USB_STATE_PATH=/sys/class/udc/3f980000.usb/state
-      - SENDER_CAPSLOCK_PATH=/run/linuxkey/capslock
-      - SENDER_LAYOUT_TOKEN=true
-$httpsEnvLines    volumes:
-      - /run/linuxkey:/run/linuxkey:ro
-$httpsVolumeLine
-"@
 Set-Content -Path $composeTemp -Value $composeContent -Encoding ASCII
 
 Write-Host "Copying artifacts to $TargetHost..." -ForegroundColor Cyan
@@ -261,98 +275,13 @@ if ($SkipUpload) {
     }
 }
 
-$remoteTemplate = @'
-set -e
-skip_apt="__SKIP_APT__"
-arch=$(uname -m)
-if [ "$arch" = "armv6l" ]; then
-    echo "armv6l detected: .NET container images do not support Pi Zero (armv6). Use a Pi with armv7+ or deploy without Docker." >&2
-    exit 1
-fi
-if [ "$skip_apt" != "true" ]; then
-  sudo apt-get update
-fi
-if ! command -v docker >/dev/null 2>&1; then
-    if [ "$skip_apt" = "true" ]; then
-      echo "Docker is missing and -SkipApt was set. Install Docker first or rerun without -SkipApt." >&2
-      exit 1
-    fi
-    sudo apt-get install -y docker.io
-fi
-compose_cmd=""
-if docker compose version >/dev/null 2>&1; then
-  compose_cmd="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-  compose_cmd="docker-compose"
-else
-  if [ "$skip_apt" = "true" ]; then
-    echo "Docker Compose is missing and -SkipApt was set. Install docker-compose or rerun without -SkipApt." >&2
-    exit 1
-  fi
-  sudo apt-get install -y docker-compose-plugin || sudo apt-get install -y docker-compose
-  if docker compose version >/dev/null 2>&1; then
-    compose_cmd="docker compose"
-  elif command -v docker-compose >/dev/null 2>&1; then
-    compose_cmd="docker-compose"
-  else
-    echo "Docker Compose not available." >&2
-    exit 1
-  fi
-fi
-sudo modprobe libcomposite || true
-if ! mountpoint -q /sys/kernel/config; then
-  sudo mount -t configfs none /sys/kernel/config
-fi
-cert_temp="__CERT_TEMP__"
-cert_dir="__CERT_DIR__"
-cert_dest="__CERT_DEST__"
-if [ -f "$cert_temp" ]; then
-  sudo mkdir -p "$cert_dir"
-  sudo mv "$cert_temp" "$cert_dest"
-  sudo chmod 644 "$cert_dest"
-fi
-hid_path="/tmp/setup-hid-gadget.sh"
-if [ -f /tmp/setup-hid-gadget.sh ]; then
-  sudo mkdir -p /boot/linuxkey
-  sudo mv /tmp/setup-hid-gadget.sh /boot/linuxkey/setup-hid-gadget.sh
-  sudo chmod +x /boot/linuxkey/setup-hid-gadget.sh
-  hid_path="/boot/linuxkey/setup-hid-gadget.sh"
-elif [ -f /boot/linuxkey/setup-hid-gadget.sh ]; then
-  hid_path="/boot/linuxkey/setup-hid-gadget.sh"
-fi
-if [ ! -f "$hid_path" ]; then
-  echo "HID setup script not found." >&2
-  exit 1
-fi
-cat <<EOF | sudo tee /etc/systemd/system/linuxkey-hid-gadget.service >/dev/null
-[Unit]
-Description=LinuxKey USB HID gadget setup
-After=systemd-modules-load.service
-Wants=systemd-modules-load.service
-ConditionPathExists=$hid_path
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash $hid_path
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOF
-sudo systemctl daemon-reload
-sudo systemctl enable linuxkey-hid-gadget.service
-sudo bash "$hid_path"
-sudo docker load -i /tmp/linuxkey-receiver.tar
-sudo docker load -i /tmp/linuxkey-sender.tar
-compose_project="linuxkey"
-sudo $compose_cmd -p "$compose_project" -f /tmp/docker-compose.yml down --remove-orphans || true
-sudo $compose_cmd -p "$compose_project" -f /tmp/docker-compose.yml up -d --force-recreate
-'@
-
-$remote = $remoteTemplate.Replace("__CERT_TEMP__", $remoteCertTemp)
-$remote = $remote.Replace("__CERT_DIR__", $remoteCertDir)
-$remote = $remote.Replace("__CERT_DEST__", $remoteCertPath)
-$remote = $remote.Replace("__SKIP_APT__", ($(if ($SkipApt) { "true" } else { "false" })))
+$remoteTemplate = Get-TemplateContent -Path $remoteTemplatePath
+$remote = Replace-TemplateTokens -Template $remoteTemplate -Tokens @{
+    "__CERT_TEMP__" = $remoteCertTemp
+    "__CERT_DIR__" = $remoteCertDir
+    "__CERT_DEST__" = $remoteCertPath
+    "__SKIP_APT__" = $(if ($SkipApt) { "true" } else { "false" })
+}
 
 Write-Host "Deploying via SSH..." -ForegroundColor Cyan
 Invoke-SshWithRetry -Command $remote -Purpose "deploy"
