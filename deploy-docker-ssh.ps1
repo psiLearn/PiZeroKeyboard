@@ -22,7 +22,9 @@ param(
     [int]$RetryDelaySec = 5,
     [int]$SshTimeoutSec = 15,
     [switch]$CompressTransfers,
+    # Skip building images locally (expects linuxkey-*.tar already present)
     [switch]$SkipBuild,
+    # Skip uploading artifacts (expects /tmp/linuxkey-*.tar, /tmp/docker-compose.yml, /tmp/setup-hid-gadget.sh on target)
     [switch]$SkipUpload,
     [switch]$SkipApt,
     [switch]$NoCache
@@ -30,6 +32,11 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+$skipBuildEffective = $SkipBuild -or $SkipUpload
+if ($SkipUpload -and -not $SkipBuild) {
+    Write-Warning "SkipUpload implies SkipBuild; build step will be skipped."
+}
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw "Docker CLI not found. Install Docker Desktop/Engine with buildx support."
@@ -146,7 +153,7 @@ $remoteCertTemp = "/tmp/linuxkey-sender.pfx"
 if ($httpsEnabled -and -not (Test-Path $HttpsCertPath)) {
     throw "HTTPS certificate not found at '$HttpsCertPath'."
 }
-if (-not $SkipBuild) {
+if (-not $skipBuildEffective) {
     $dockerOs = Ensure-DockerReady
     if ($dockerOs -ne "linux") {
         throw "Docker engine is running in '$dockerOs' mode. Switch to Linux containers and retry."
@@ -156,7 +163,7 @@ if (-not $SkipBuild) {
     }
 }
 
-if (-not $SkipBuild) {
+if (-not $skipBuildEffective) {
     Write-Host "Building receiver image ($Platform) -> $tarPath" -ForegroundColor Cyan
     $cacheArgs = @()
     if ($NoCache) { $cacheArgs += "--no-cache" }
@@ -180,7 +187,7 @@ if (-not $SkipBuild) {
     docker save -o $senderTar $SenderImage
 }
 
-if (-not $SkipBuild) {
+if (-not $skipBuildEffective) {
     foreach ($p in @($tarPath, $senderTar)) {
         if (-not (Test-Path $p)) { throw "Build did not produce $p" }
     }
@@ -240,7 +247,7 @@ if ($SkipUpload) {
         Write-Warning "HTTPS enabled; ensure $remoteCertPath exists on the target."
     }
 } else {
-    if ($SkipBuild) {
+    if ($skipBuildEffective) {
         foreach ($p in @($tarPath, $senderTar)) {
             if (-not (Test-Path $p)) { throw "Missing $p. Provide tar files or disable -SkipBuild." }
         }
