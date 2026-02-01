@@ -1,5 +1,17 @@
 set -e
 skip_apt="__SKIP_APT__"
+tar_dir="__TAR_DIR__"
+receiver_tar="__RECEIVER_TAR__"
+sender_tar="__SENDER_TAR__"
+if [ ! -d "$tar_dir" ]; then
+  sudo mkdir -p "$tar_dir"
+fi
+if [ ! -f "$receiver_tar" ] && [ -f /tmp/linuxkey-receiver.tar ]; then
+  receiver_tar="/tmp/linuxkey-receiver.tar"
+fi
+if [ ! -f "$sender_tar" ] && [ -f /tmp/linuxkey-sender.tar ]; then
+  sender_tar="/tmp/linuxkey-sender.tar"
+fi
 arch=$(uname -m)
 if [ "$arch" = "armv6l" ]; then
     echo "armv6l detected: .NET container images do not support Pi Zero (armv6). Use a Pi with armv7+ or deploy without Docker." >&2
@@ -60,6 +72,7 @@ if [ ! -f "$hid_path" ]; then
   echo "HID setup script not found." >&2
   exit 1
 fi
+echo "Configuring HID gadget..."
 cat <<EOF | sudo tee /etc/systemd/system/linuxkey-hid-gadget.service >/dev/null
 [Unit]
 Description=LinuxKey USB HID gadget setup
@@ -78,8 +91,21 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable linuxkey-hid-gadget.service
 sudo bash "$hid_path"
-sudo docker load -i /tmp/linuxkey-receiver.tar
-sudo docker load -i /tmp/linuxkey-sender.tar
+echo "Loading receiver image: $receiver_tar"
+if command -v pv >/dev/null 2>&1; then
+  pv "$receiver_tar" | sudo docker load
+else
+  sudo docker load -i "$receiver_tar"
+fi
+echo "Loading sender image: $sender_tar"
+if command -v pv >/dev/null 2>&1; then
+  pv "$sender_tar" | sudo docker load
+else
+  sudo docker load -i "$sender_tar"
+fi
 compose_project="linuxkey"
+echo "Stopping existing stack (if any)..."
 sudo $compose_cmd -p "$compose_project" -f /tmp/docker-compose.yml down --remove-orphans || true
+echo "Starting stack..."
 sudo $compose_cmd -p "$compose_project" -f /tmp/docker-compose.yml up -d --force-recreate
+echo "Deploy complete."

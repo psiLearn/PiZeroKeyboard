@@ -191,6 +191,9 @@ function Invoke-SshWithRetry {
 
 $tarPath = Join-Path $PSScriptRoot "linuxkey-receiver.tar"
 $senderTar = Join-Path $PSScriptRoot "linuxkey-sender.tar"
+$remoteTarDir = "/var/tmp/linuxkey"
+$remoteReceiverTar = "$remoteTarDir/linuxkey-receiver.tar"
+$remoteSenderTar = "$remoteTarDir/linuxkey-sender.tar"
 $httpsEnabled = -not [string]::IsNullOrWhiteSpace($HttpsCertPath)
 $remoteCertDir = "/etc/linuxkey/certs"
 $remoteCertPath = "$remoteCertDir/sender.pfx"
@@ -256,7 +259,7 @@ Set-Content -Path $composeTemp -Value $composeContent -Encoding ASCII
 
 Write-Host "Copying artifacts to $TargetHost..." -ForegroundColor Cyan
 if ($SkipUpload) {
-    Write-Warning "Skipping uploads; expecting /tmp/linuxkey-*.tar, /tmp/docker-compose.yml, and /tmp/setup-hid-gadget.sh to exist on the target."
+    Write-Warning "Skipping uploads; expecting $remoteReceiverTar, $remoteSenderTar, /tmp/docker-compose.yml, and /tmp/setup-hid-gadget.sh to exist on the target."
     if ($httpsEnabled) {
         Write-Warning "HTTPS enabled; ensure $remoteCertPath exists on the target."
     }
@@ -266,8 +269,8 @@ if ($SkipUpload) {
             if (-not (Test-Path $p)) { throw "Missing $p. Provide tar files or disable -SkipBuild." }
         }
     }
-    Invoke-ScpWithRetry -Source $tarPath -Destination "${sshTarget}:/tmp/linuxkey-receiver.tar" -Purpose "receiver image"
-    Invoke-ScpWithRetry -Source $senderTar -Destination "${sshTarget}:/tmp/linuxkey-sender.tar" -Purpose "sender image"
+    Invoke-ScpWithRetry -Source $tarPath -Destination "${sshTarget}:${remoteReceiverTar}" -Purpose "receiver image"
+    Invoke-ScpWithRetry -Source $senderTar -Destination "${sshTarget}:${remoteSenderTar}" -Purpose "sender image"
     Invoke-ScpWithRetry -Source (Join-Path $PSScriptRoot "PiSetup/setup-hid-gadget.sh") -Destination "${sshTarget}:/tmp/setup-hid-gadget.sh" -Purpose "HID setup script"
     Invoke-ScpWithRetry -Source $composeTemp -Destination "${sshTarget}:/tmp/docker-compose.yml" -Purpose "compose file"
     if ($httpsEnabled) {
@@ -281,6 +284,9 @@ $remote = Replace-TemplateTokens -Template $remoteTemplate -Tokens @{
     "__CERT_DIR__" = $remoteCertDir
     "__CERT_DEST__" = $remoteCertPath
     "__SKIP_APT__" = $(if ($SkipApt) { "true" } else { "false" })
+    "__TAR_DIR__" = $remoteTarDir
+    "__RECEIVER_TAR__" = $remoteReceiverTar
+    "__SENDER_TAR__" = $remoteSenderTar
 }
 
 Write-Host "Deploying via SSH..." -ForegroundColor Cyan
